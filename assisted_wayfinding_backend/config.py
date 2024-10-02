@@ -5,6 +5,7 @@ def get_config(env: str) -> Dict[str, Any]:
         'project_name': 'AssistedWayfinding',
         'lambda_runtime': 'python3.9',
         'lambda_handler': 'index.handler',
+        'environment': env,
     }
 
     env_specific_config = {

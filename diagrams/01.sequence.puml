@@ -1,0 +1,72 @@
+@startuml Assisted Wayfinding
+skinparam sequenceMessageAlign center
+skinparam boxPadding 10
+
+box "Client Side" #LightBlue
+participant "Airport Kiosk App" as App
+end box
+
+box "AWS Cloud" #LightYellow
+participant "API Gateway" as API
+participant "Face Recognition Lambda" as LambdaFR
+participant "Amazon Rekognition" as Rekognition
+participant "DynamoDB" as DynamoDB
+participant "S3 Bucket" as S3
+participant "Flight Info Lambda" as LambdaFI
+end box
+
+App -> App: Detect face using Google ML Toolkit
+activate App
+
+App -> API: Send captured face image
+activate API
+
+API -> LambdaFR: Trigger face recognition
+activate LambdaFR
+
+LambdaFR -> Rekognition: Request facial analysis
+activate Rekognition
+Rekognition --> LambdaFR: Return facial analysis results
+deactivate Rekognition
+
+LambdaFR -> DynamoDB: Query passenger list
+activate DynamoDB
+DynamoDB --> LambdaFR: Return passenger data and S3 photo references
+deactivate DynamoDB
+
+LambdaFR -> S3: Retrieve passenger photos
+activate S3
+S3 --> LambdaFR: Return passenger photos
+deactivate S3
+
+LambdaFR -> Rekognition: Compare captured face with passenger photos
+activate Rekognition
+Rekognition --> LambdaFR: Return face comparison results
+deactivate Rekognition
+
+alt Face matched
+    LambdaFR -> LambdaFI: Trigger flight info retrieval for matched passenger
+    activate LambdaFI
+
+    LambdaFI -> DynamoDB: Query flight information
+    activate DynamoDB
+    DynamoDB --> LambdaFI: Return flight details
+    deactivate DynamoDB
+
+    LambdaFI --> LambdaFR: Return flight information
+    deactivate LambdaFI
+
+    LambdaFR --> API: Return matched passenger and flight information
+else No match found
+    LambdaFR --> API: Return no match found
+end
+
+deactivate LambdaFR
+
+API --> App: Return result (passenger and flight information or no match)
+deactivate API
+
+App -> App: Display result
+deactivate App
+
+@enduml
