@@ -1,3 +1,271 @@
+### API Endpoints Documentation
+
+#### 1. Index Face
+
+**Endpoint:** `/index`
+
+**Method:** POST
+
+**Description:** This endpoint is used to index a new face in the Rekognition collection and store associated passenger data.
+
+**Request Body:**
+```json
+{
+  "image": "base64_encoded_image_string",
+  "passengerData": {
+    "name": "string",
+    "passengerId": "string",
+    "changi_app_user_id": "string",
+    "next_flight_id": "string",
+    "has_lounge_access": boolean,
+    "accessibility_needs": boolean
+  }
+}
+```
+
+**Response:**
+- Success (200 OK):
+  ```json
+  {
+    "faceId": "string",
+    "message": "Face indexed successfully"
+  }
+  ```
+- Error (500 Internal Server Error):
+  ```json
+  {
+    "error": "Error message"
+  }
+  ```
+
+**Implementation Details:**
+The indexing process involves the following steps:
+1. Decode the base64 image.
+2. Upload the image to an S3 bucket.
+3. Index the face using Amazon Rekognition.
+4. Store passenger data in DynamoDB.
+
+For the detailed implementation, refer to:
+
+```9:90:assisted_wayfinding_backend/lambda_functions/face_indexing/index.py
+def handler(event, context):
+    print("Face Indexing Lambda function invoked")
+
+    # Get environment variables
+    table_name = os.environ.get("DYNAMODB_TABLE_NAME")
+    collection_id = os.environ.get("REKOGNITION_COLLECTION_ID")
+    bucket_name = os.environ.get("S3_BUCKET_NAME")
+
+    if not table_name or not collection_id or not bucket_name:
+        missing_vars = []
+        if not table_name:
+            missing_vars.append("DYNAMODB_TABLE_NAME")
+        if not collection_id:
+            missing_vars.append("REKOGNITION_COLLECTION_ID")
+        if not bucket_name:
+            missing_vars.append("S3_BUCKET_NAME")
+
+        error_message = (
+            f"Missing required environment variables: {', '.join(missing_vars)}"
+        )
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": error_message}),
+        }
+
+    # Initialize AWS clients
+    dynamodb = boto3.resource("dynamodb")
+    rekognition = boto3.client("rekognition")
+    s3 = boto3.client("s3")
+    table = dynamodb.Table(table_name)
+
+    try:
+        # Extract base64-encoded image and passenger data from the event
+        body = json.loads(event["body"])
+        image_bytes = base64.b64decode(body["image"])
+        passenger_data = body["passengerData"]
+
+        # Upload image to S3
+        s3_key = f"passenger_photos/{passenger_data['passengerId']}.jpg"
+        s3.put_object(Bucket=bucket_name, Key=s3_key, Body=image_bytes)
+
+        # Index the face in Rekognition
+        index_response = rekognition.index_faces(
+            CollectionId=collection_id,
+            Image={"S3Object": {"Bucket": bucket_name, "Name": s3_key}},
+            ExternalImageId=passenger_data["passengerId"],
+            DetectionAttributes=["ALL"],
+        )
+
+        if index_response["FaceRecords"]:
+            face_id = index_response["FaceRecords"][0]["Face"]["FaceId"]
+
+            # Store the mapping in DynamoDB
+            table.put_item(
+                Item={
+                    "faceId": face_id,
+                    "image_url": f"https://{bucket_name}.s3.amazonaws.com/{s3_key}",
+                    "rekognition_collection_id": collection_id,
+                    "passengerId": passenger_data["passengerId"],
+                    "name": passenger_data["name"],
+                    "changi_app_user_id": passenger_data["changi_app_user_id"],
+                    "next_flight_id": passenger_data["next_flight_id"],
+                    "has_lounge_access": passenger_data["has_lounge_access"],
+                    "accessibility_needs": passenger_data["accessibility_needs"],
+                }
+            )
+
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {"message": "Face indexed successfully", "faceId": face_id}
+                ),
+            }
+        else:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"message": "No face detected in the image"}),
+            }
+    except ClientError as e:
+        print(f"Error: {str(e)}")
+        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+```
+
+
+#### 2. Recognize Face
+
+**Endpoint:** `/recognize`
+
+**Method:** POST
+
+**Description:** This endpoint is used to recognize a face from a given image and retrieve associated passenger data.
+
+**Request Body:**
+```json
+{
+  "image": "base64_encoded_image_string"
+}
+```
+
+**Response:**
+- Success (200 OK):
+  ```json
+  {
+    "name": "string",
+    "passengerId": "string",
+    "changi_app_user_id": "string",
+    "next_flight_id": "string",
+    "has_lounge_access": boolean,
+    "accessibility_needs": boolean
+  }
+  ```
+- Not Found (404 Not Found):
+  ```json
+  {
+    "message": "No matching face found"
+  }
+  ```
+- Error (500 Internal Server Error):
+  ```json
+  {
+    "error": "Error message"
+  }
+  ```
+
+**Implementation Details:**
+The recognition process involves the following steps:
+1. Decode the base64 image.
+2. Search for matching faces using Amazon Rekognition.
+3. Retrieve associated passenger data from DynamoDB.
+
+For the detailed implementation, refer to:
+
+```10:85:assisted_wayfinding_backend/lambda_functions/face_recognition/index.py
+def handler(event, context):
+    print("Face Recognition Lambda function invoked")
+
+    # Get environment variables
+    table_name = os.environ.get("DYNAMODB_TABLE_NAME")
+    collection_id = os.environ.get("REKOGNITION_COLLECTION_ID")
+    bucket_name = os.environ.get("S3_BUCKET_NAME")
+
+    if not table_name or not collection_id or not bucket_name:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": "Missing required environment variables"}),
+        }
+
+    # Initialize AWS clients
+    dynamodb = boto3.resource("dynamodb")
+    rekognition = boto3.client("rekognition")
+    s3 = boto3.client("s3")
+    table = dynamodb.Table(table_name)
+
+    try:
+        # Extract base64-encoded image from the event
+        body = json.loads(event["body"])
+        image_bytes = base64.b64decode(body["image"])
+
+        # Upload image to S3 temporarily
+        s3_key = f"temp_images/{context.aws_request_id}.jpg"
+        s3.put_object(Bucket=bucket_name, Key=s3_key, Body=image_bytes)
+
+        # Search for matching faces in Rekognition
+        search_response = rekognition.search_faces_by_image(
+            CollectionId=collection_id,
+            Image={"S3Object": {"Bucket": bucket_name, "Name": s3_key}},
+            MaxFaces=1,
+            FaceMatchThreshold=70,  # Adjust this threshold as needed
+        )
+        # Delete the temporary image
+        s3.delete_object(Bucket=bucket_name, Key=s3_key)
+
+        if search_response["FaceMatches"]:
+            face_id = search_response["FaceMatches"][0]["Face"]["FaceId"]
+
+            # Get passengerId using the new function
+            passenger_id = get_passenger_id_from_face_id(face_id, table)
+
+            if passenger_id:
+                response = table.get_item(Key={"passengerId": passenger_id})
+
+                if "Item" in response:
+                    passenger_data = response["Item"]
+                    return {
+                        "statusCode": 200,
+                        "body": json.dumps(
+                            {
+                                "message": "Face recognized",
+                                "passengerData": passenger_data,
+                            }
+                        ),
+                    }
+
+            return {
+                "statusCode": 404,
+                "body": json.dumps(
+                    {"message": "No passenger data found for the recognized face"}
+                ),
+            }
+        else:
+            return {
+                "statusCode": 404,
+                "body": json.dumps({"message": "No matching face found"}),
+            }
+    except ClientError as e:
+        print(f"Error: {str(e)}")
+        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+```
+
+
+These endpoints are designed to work with the AWS services including S3, Rekognition, and DynamoDB. Ensure that the necessary permissions and configurations are set up as described in the deployment instructions.
+
+
+
+
+
+
+
 As a Software Architect with 10 years of experience, I will outline the steps needed to integrate facial recognition into your application using AWS services and the AWS Cloud Development Kit (CDK).
 
 Overview
