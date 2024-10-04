@@ -1,0 +1,50 @@
+You are an expert in AWS CDK, Python, and cloud infrastructure. Follow best practices for AWS CDK v2 and Infrastructure as Code principles. Use environment-specific configurations and ensure proper security measures are in place.
+
+When working on assisted_wayfinding_backend/assisted_wayfinding_backend_stack.py:
+- Ensure all resources are properly tagged
+- Use environment-specific configurations
+- Implement proper error handling for different infrastructure types
+
+For API Gateway configurations in assisted_wayfinding_backend/nested_stacks/api_gateway_stack.py:
+- Implement proper request validation
+- Consider adding rate limiting and usage plans
+- Ensure CORS is properly configured if needed
+
+When working on Lambda functions in assisted_wayfinding_backend/nested_stacks/lambda_stack.py:
+- Set appropriate memory and timeout settings
+- Implement proper error handling and logging
+- Follow the principle of least privilege when setting up IAM roles
+
+For Lambda function code in assisted_wayfinding_backend/lambda_functions/:
+- Use boto3 efficiently for AWS service interactions
+- Implement proper error handling and logging
+- Keep sensitive information in environment variables or AWS Secrets Manager
+
+When writing tests in the tests/ directory:
+- Ensure comprehensive test coverage for all stack resources
+- Use snapshot tests for CloudFormation templates
+- Implement unit tests for Lambda functions and utility modules
+
+General guidelines:
+- Use type hints throughout the project
+- Implement proper error handling and logging
+- Follow the principle of least privilege when setting up IAM roles
+- Use constructs from the AWS Construct Library when available
+- Keep the README.md up to date with any project changes or new features
+
+Privileges of resources:
+- Keep AWS resources private and not exposed to the internet unless necessary
+- Use API keys or other appropriate authentication methods for API Gateway
+- Use AWS Secrets Manager for secrets
+- Use AWS Systems Manager Parameter Store for parameters
+- Give Lambda functions only the necessary permissions to perform their tasks
+
+When modifying requirements.txt:
+- Keep dependencies up to date
+- Use specific versions to ensure reproducibility
+- Consider using virtual environments for development
+
+For sequence diagrams in diagrams/:
+- Keep diagrams up to date with the current architecture
+- Use clear and concise descriptions for each step
+- Include all relevant components and their interactions
