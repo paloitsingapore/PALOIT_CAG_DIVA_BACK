@@ -3,6 +3,7 @@ import json
 import os
 
 import boto3
+from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
 
@@ -49,24 +50,30 @@ def handler(event, context):
         if search_response["FaceMatches"]:
             face_id = search_response["FaceMatches"][0]["Face"]["FaceId"]
 
-            # Retrieve passenger data from DynamoDB
-            response = table.get_item(Key={"faceId": face_id})
+            # Get passengerId using the new function
+            passenger_id = get_passenger_id_from_face_id(face_id, table)
 
-            if "Item" in response:
-                passenger_data = response["Item"]
-                return {
-                    "statusCode": 200,
-                    "body": json.dumps(
-                        {"message": "Face recognized", "passengerData": passenger_data}
-                    ),
-                }
-            else:
-                return {
-                    "statusCode": 404,
-                    "body": json.dumps(
-                        {"message": "No passenger data found for the recognized face"}
-                    ),
-                }
+            if passenger_id:
+                response = table.get_item(Key={"passengerId": passenger_id})
+
+                if "Item" in response:
+                    passenger_data = response["Item"]
+                    return {
+                        "statusCode": 200,
+                        "body": json.dumps(
+                            {
+                                "message": "Face recognized",
+                                "passengerData": passenger_data,
+                            }
+                        ),
+                    }
+
+            return {
+                "statusCode": 404,
+                "body": json.dumps(
+                    {"message": "No passenger data found for the recognized face"}
+                ),
+            }
         else:
             return {
                 "statusCode": 404,
@@ -76,3 +83,20 @@ def handler(event, context):
     except ClientError as e:
         print(f"Error: {str(e)}")
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+
+
+def get_passenger_id_from_face_id(face_id, table):
+    try:
+        # Query the table using a secondary index on faceId
+        response = table.query(
+            IndexName="faceId-index",  # You'll need to create this secondary index
+            KeyConditionExpression=Key("faceId").eq(face_id),
+        )
+
+        if response["Items"]:
+            return response["Items"][0]["passengerId"]
+        else:
+            return None
+    except ClientError as e:
+        print(f"Error querying DynamoDB: {str(e)}")
+        return None

@@ -58,10 +58,20 @@ def handler(event, context):
         if index_response["FaceRecords"]:
             face_id = index_response["FaceRecords"][0]["Face"]["FaceId"]
 
-            # Store passenger data in DynamoDB
-            passenger_data["faceId"] = face_id
-            passenger_data["s3Key"] = s3_key
-            table.put_item(Item=passenger_data)
+            # Store the mapping in DynamoDB
+            table.put_item(
+                Item={
+                    "faceId": face_id,
+                    "image_url": f"https://{bucket_name}.s3.amazonaws.com/{s3_key}",
+                    "rekognition_collection_id": collection_id,
+                    "passengerId": passenger_data["passengerId"],
+                    "name": passenger_data["name"],
+                    "changi_app_user_id": passenger_data["changi_app_user_id"],
+                    "next_flight_id": passenger_data["next_flight_id"],
+                    "has_lounge_access": passenger_data["has_lounge_access"],
+                    "accessibility_needs": passenger_data["accessibility_needs"],
+                }
+            )
 
             return {
                 "statusCode": 200,

@@ -13,3 +13,5 @@ cdk.out
 .env
 /manual
 /users
+payload.json
+.cursorrules
