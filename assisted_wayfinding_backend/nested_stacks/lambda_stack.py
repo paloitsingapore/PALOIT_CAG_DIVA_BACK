@@ -84,11 +84,88 @@ class LambdaStack(NestedStack):
         self.face_recognition_function.add_to_role_policy(dynamodb_policy)
         self.face_indexing_function.add_to_role_policy(dynamodb_policy)
 
-        # Add S3 permissions
+        # Add S3 permissions to both functions
         s3_policy = iam.PolicyStatement(
-            actions=["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
-            resources=[f"arn:aws:s3:::{config['s3_bucket_name'].lower()}/*"],
+            actions=[
+                "s3:PutObject",
+                "s3:GetObject",
+                "s3:DeleteObject",  # Add this line
+            ],
+            resources=[
+                f"arn:aws:s3:::{config['s3_bucket_name']}/*",
+                f"arn:aws:s3:::{config['s3_bucket_name']}",
+            ],
+        )
+        self.face_indexing_function.add_to_role_policy(s3_policy)
+        self.face_recognition_function.add_to_role_policy(s3_policy)
+
+        # Update the Rekognition permissions for the face indexing function
+        face_indexing_rekognition_policy = iam.PolicyStatement(
+            actions=[
+                "rekognition:CreateUser",
+                "rekognition:IndexFaces",
+                "rekognition:SearchFacesByImage",
+                "rekognition:ListFaces",
+                "rekognition:AssociateFaces",
+            ],
+            resources=[
+                f"arn:aws:rekognition:{self.region}:{self.account}:collection/{config['rekognition_collection_id']}"
+            ],
+        )
+        self.face_indexing_function.add_to_role_policy(face_indexing_rekognition_policy)
+
+        # Add DynamoDB permissions to both functions
+        dynamodb_policy = iam.PolicyStatement(
+            actions=[
+                "dynamodb:PutItem",
+                "dynamodb:GetItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:Query",
+            ],
+            resources=[
+                f"arn:aws:dynamodb:{self.region}:{self.account}:table/{config['dynamodb_table_name']}"
+            ],
+        )
+        self.face_indexing_function.add_to_role_policy(dynamodb_policy)
+        self.face_recognition_function.add_to_role_policy(dynamodb_policy)
+
+        # Add new function for removing all faces
+        self.remove_all_faces_function = _lambda.Function(
+            self,
+            "RemoveAllFacesFunction",
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            handler="index.handler",
+            code=_lambda.Code.from_asset(
+                "assisted_wayfinding_backend/lambda_functions/remove_all_faces"
+            ),
+            environment={
+                "DYNAMODB_TABLE_NAME": config["dynamodb_table_name"],
+                "REKOGNITION_COLLECTION_ID": config["rekognition_collection_id"],
+            },
         )
 
-        self.face_recognition_function.add_to_role_policy(s3_policy)
-        self.face_indexing_function.add_to_role_policy(s3_policy)
+        # Update permissions for the remove_all_faces_function
+        self.remove_all_faces_function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "rekognition:ListFaces",
+                    "rekognition:DeleteFaces",
+                ],
+                resources=[
+                    f"arn:aws:rekognition:*:*:collection/{config['rekognition_collection_id']}"
+                ],
+            )
+        )
+
+        self.remove_all_faces_function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "dynamodb:Scan",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:BatchWriteItem",  # Add this line
+                ],
+                resources=[
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/{config['dynamodb_table_name']}"
+                ],
+            )
+        )

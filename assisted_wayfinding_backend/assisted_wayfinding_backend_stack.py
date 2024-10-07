@@ -27,12 +27,21 @@ class AssistedWayfindingBackendStack(Stack):
             self, f"{config['project_name']}StorageStack", config=config
         )
 
+        # Update config with necessary values
+        config.update(
+            {
+                "rekognition_collection_id": "AssistedWayfindingFaces",
+                "s3_bucket_name": storage_stack.passenger_photos_bucket.bucket_name,
+                "dynamodb_table_name": dynamodb_stack.table_name,  # Use the table_name property
+            }
+        )
+
         # Create the Lambda nested stack
         lambda_stack = LambdaStack(
             self, f"{config['project_name']}LambdaStack", config=config
         )
 
-        # Pass S3 bucket name to Lambda functions
+        # Pass S3 bucket name and DynamoDB table name to Lambda functions
         lambda_stack.face_indexing_function.add_environment(
             "S3_BUCKET_NAME", storage_stack.passenger_photos_bucket.bucket_name
         )
@@ -65,3 +74,11 @@ class AssistedWayfindingBackendStack(Stack):
             "POST", face_recognition_integration
         )
         api.root.add_resource("index").add_method("POST", face_indexing_integration)
+
+        remove_all_faces_integration = apigw.LambdaIntegration(
+            lambda_stack.remove_all_faces_function
+        )
+
+        api.root.add_resource("remove_all_faces").add_method(
+            "POST", remove_all_faces_integration
+        )

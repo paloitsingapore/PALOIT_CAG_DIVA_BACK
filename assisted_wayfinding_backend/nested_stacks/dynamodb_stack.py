@@ -1,6 +1,5 @@
 from aws_cdk import (
     NestedStack,
-    RemovalPolicy,
 )
 from aws_cdk import (
     aws_dynamodb as dynamodb,
@@ -14,40 +13,19 @@ class DynamoDBStack(NestedStack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Create a DynamoDB table for passenger information
-        self.passenger_table = dynamodb.Table(
+        self._table = dynamodb.Table(
             self,
-            "PassengerTable",
-            table_name=f"{config['project_name']}-PassengerTable-{config['environment']}",
+            "AssistedWayfindingTable",
             partition_key=dynamodb.Attribute(
-                name="passengerId", type=dynamodb.AttributeType.STRING
+                name="userId", type=dynamodb.AttributeType.STRING
             ),
-            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
-            removal_policy=RemovalPolicy.DESTROY
-            if config["environment"] == "dev"
-            else RemovalPolicy.RETAIN,
+            # ... other table properties ...
         )
 
-        # Add GSI for lookups by age range and gender
-        self.passenger_table.add_global_secondary_index(
-            index_name="AgeGenderIndex",
-            partition_key=dynamodb.Attribute(
-                name="ageRange", type=dynamodb.AttributeType.STRING
-            ),
-            sort_key=dynamodb.Attribute(
-                name="gender", type=dynamodb.AttributeType.STRING
-            ),
-        )
+    @property
+    def table_name(self):
+        return self._table.table_name
 
-        # Add a secondary index on faceId
-        self.passenger_table.add_global_secondary_index(
-            index_name="faceId-index",
-            partition_key=dynamodb.Attribute(
-                name="faceId", type=dynamodb.AttributeType.STRING
-            ),
-            projection_type=dynamodb.ProjectionType.ALL,
-        )
-
-        # Expose table properties
-        self.table_name = self.passenger_table.table_name
-        self.table_arn = self.passenger_table.table_arn
+    @property
+    def table(self):
+        return self._table

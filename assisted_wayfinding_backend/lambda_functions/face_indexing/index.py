@@ -38,53 +38,72 @@ def handler(event, context):
     table = dynamodb.Table(table_name)
 
     try:
-        # Extract base64-encoded image and passenger data from the event
+        # Extract data from the event
         body = json.loads(event["body"])
-        image_bytes = base64.b64decode(body["image"])
+        user_id = body["userId"]
+        images = body["images"]
         passenger_data = body["passengerData"]
 
-        # Upload image to S3
-        s3_key = f"passenger_photos/{passenger_data['passengerId']}.jpg"
-        s3.put_object(Bucket=bucket_name, Key=s3_key, Body=image_bytes)
+        face_ids = []
+        image_urls = []
+        for i, image in enumerate(images):
+            # Decode and upload image to S3
+            image_bytes = base64.b64decode(image)
+            s3_key = f"user_photos/{user_id}_face_{i}.jpg"
+            s3.put_object(Bucket=bucket_name, Key=s3_key, Body=image_bytes)
 
-        # Index the face in Rekognition
-        index_response = rekognition.index_faces(
-            CollectionId=collection_id,
-            Image={"S3Object": {"Bucket": bucket_name, "Name": s3_key}},
-            ExternalImageId=passenger_data["passengerId"],
-            DetectionAttributes=["ALL"],
-        )
+            # Store the S3 URL
+            image_url = f"https://{bucket_name}.s3.amazonaws.com/{s3_key}"
+            image_urls.append(image_url)
 
-        if index_response["FaceRecords"]:
-            face_id = index_response["FaceRecords"][0]["Face"]["FaceId"]
-
-            # Store the mapping in DynamoDB
-            table.put_item(
-                Item={
-                    "faceId": face_id,
-                    "image_url": f"https://{bucket_name}.s3.amazonaws.com/{s3_key}",
-                    "rekognition_collection_id": collection_id,
-                    "passengerId": passenger_data["passengerId"],
-                    "name": passenger_data["name"],
-                    "changi_app_user_id": passenger_data["changi_app_user_id"],
-                    "next_flight_id": passenger_data["next_flight_id"],
-                    "has_lounge_access": passenger_data["has_lounge_access"],
-                    "accessibility_needs": passenger_data["accessibility_needs"],
-                }
+            # Index the face in Rekognition
+            index_response = rekognition.index_faces(
+                CollectionId=collection_id,
+                Image={"S3Object": {"Bucket": bucket_name, "Name": s3_key}},
+                ExternalImageId=user_id,  # Associate face with user_id
+                DetectionAttributes=["ALL"],
             )
 
-            return {
-                "statusCode": 200,
-                "body": json.dumps(
-                    {"message": "Face indexed successfully", "faceId": face_id}
-                ),
-            }
-        else:
+            if index_response["FaceRecords"]:
+                face_ids.append(index_response["FaceRecords"][0]["Face"]["FaceId"])
+
+        # Optionally, handle if no faces are detected
+        if not face_ids:
             return {
                 "statusCode": 400,
-                "body": json.dumps({"message": "No face detected in the image"}),
+                "body": json.dumps(
+                    {"error": "No faces detected in the provided images."}
+                ),
             }
+
+        # Store user data in DynamoDB
+        table.put_item(
+            Item={
+                "userId": user_id,
+                "faceIds": face_ids,
+                "imageUrls": image_urls,
+                "rekognition_collection_id": collection_id,
+                **passenger_data,
+            }
+        )
+
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {
+                    "message": "User created and faces indexed successfully",
+                    "userId": user_id,
+                    "faceIds": face_ids,
+                }
+            ),
+        }
 
     except ClientError as e:
         print(f"Error: {str(e)}")
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+    except Exception as e:
+        print(f"Unexpected Error: {str(e)}")
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": "An unexpected error occurred."}),
+        }

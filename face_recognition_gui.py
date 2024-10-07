@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 import os
 import random
 import tkinter as tk
@@ -10,6 +11,12 @@ import requests
 from dotenv import load_dotenv
 from PIL import Image, ImageTk
 
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 API_KEY = os.environ.get("API_KEY")
 API_ENDPOINT = os.environ.get("API_ENDPOINT_URL")
@@ -17,6 +24,7 @@ API_ENDPOINT = os.environ.get("API_ENDPOINT_URL")
 
 class FaceRecognitionApp:
     def __init__(self, master):
+        logger.info("Initializing FaceRecognitionApp")
         self.master = master
         self.master.title("Face Recognition App")
         self.is_capturing = False
@@ -52,11 +60,18 @@ class FaceRecognitionApp:
             variable=self.accessibility_needs,
         ).grid(row=2, column=0, columnspan=3, sticky="w")
 
-        tk.Button(
+        self.capture_button = tk.Button(
+            self.index_frame, text="Capture Face", command=self.capture_face
+        )
+        self.capture_button.grid(row=3, column=0)
+
+        self.index_button = tk.Button(
             self.index_frame,
-            text="Capture & Index Face",
-            command=lambda: self.start_capture("index"),
-        ).grid(row=3, column=0, columnspan=3)
+            text="Index User",
+            command=self.index_user,
+            state=tk.DISABLED,
+        )
+        self.index_button.grid(row=3, column=1)
 
         # Frame for recognizing face
         self.recognize_frame = tk.Frame(self.master)
@@ -83,13 +98,27 @@ class FaceRecognitionApp:
         )
         self.canvas.pack()
 
+        self.captured_faces = []
+
+        # Add a new button for removing all faces
+        self.remove_all_button = tk.Button(
+            self.master,
+            text="Remove All Faces",
+            command=self.remove_all_faces,
+            bg="red",
+            fg="white",
+        )
+        self.remove_all_button.pack(pady=10)
+
     def start_capture(self, action):
+        logger.info(f"Starting capture for action: {action}")
         self.action = action
         self.is_capturing = True
         self.stop_button.config(state=tk.NORMAL)
         self.capture_image()
 
     def stop_capture(self):
+        logger.info("Stopping capture")
         self.is_capturing = False
         self.stop_button.config(state=tk.DISABLED)
         if self.cap:
@@ -100,6 +129,7 @@ class FaceRecognitionApp:
             self.recognize_face()
 
     def capture_image(self):
+        logger.info("Capturing image")
         self.cap = cv2.VideoCapture(0)
 
         # Set the capture resolution (you may need to adjust these values)
@@ -120,13 +150,93 @@ class FaceRecognitionApp:
                 self.frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 self.photo = ImageTk.PhotoImage(image=Image.fromarray(self.frame))
                 self.canvas.create_image(0, 0, image=self.photo, anchor=tk.NW)
-
+                logger.debug("Frame updated")
+            else:
+                logger.warning("Failed to capture frame")
             self.master.after(10, self.update_frame)
         else:
             if self.cap:
                 self.cap.release()
+                logger.info("Camera released")
+
+    def capture_face(self):
+        logger.info("Capturing face")
+        if self.frame is None:
+            logger.error("No image captured")
+            messagebox.showerror("Error", "No image captured.")
+            return
+
+        self.captured_faces.append(self.frame)
+        logger.info(f"Face captured. Total faces: {len(self.captured_faces)}")
+        messagebox.showinfo(
+            "Success", f"Face captured. Total faces: {len(self.captured_faces)}"
+        )
+
+        if len(self.captured_faces) > 0:
+            self.index_button.config(state=tk.NORMAL)
+            logger.debug("Index button enabled")
+
+    def index_user(self):
+        logger.info("Indexing user")
+        passenger_name = self.passenger_name_entry.get()
+        if not passenger_name:
+            logger.error("Passenger name is empty")
+            messagebox.showerror("Error", "Passenger name cannot be empty.")
+            return
+
+        if not self.captured_faces:
+            logger.error("No faces captured")
+            messagebox.showerror("Error", "No faces captured.")
+            return
+
+        user_id = f"user_{passenger_name.replace(' ', '_').lower()}"
+        logger.info(f"User ID: {user_id}")
+
+        # Prepare payload
+        payload = {
+            "userId": user_id,
+            "images": [],
+            "passengerData": {
+                "name": passenger_name,
+                "passengerId": f"passenger_{passenger_name.replace(' ', '_').lower()}",
+                "changi_app_user_id": f"CAU{random.randint(10000, 99999)}SQ",
+                "next_flight_id": f"SQ{random.randint(100, 999)}",
+                "has_lounge_access": self.has_lounge_access.get(),
+                "accessibility_needs": self.accessibility_needs.get(),
+            },
+        }
+
+        for i, face in enumerate(self.captured_faces):
+            filename = f"{user_id}_face_{i}.jpg"
+            image_path = os.path.join("users", filename)
+            cv2.imwrite(image_path, cv2.cvtColor(face, cv2.COLOR_RGB2BGR))
+            logger.info(f"Saved face image: {image_path}")
+
+            with open(image_path, "rb") as image_file:
+                encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+                payload["images"].append(encoded_image)
+
+        # Send payload to backend
+        logger.info(f"Sending indexing request to {API_ENDPOINT}/index")
+        response = requests.post(f"{API_ENDPOINT}/index", json=payload)
+
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f"User indexed successfully. User ID: {result['userId']}")
+            messagebox.showinfo(
+                "Success", f"User indexed successfully. User ID: {result['userId']}"
+            )
+        else:
+            logger.error(f"Failed to index user: {response.text}")
+            messagebox.showerror("Error", f"Failed to index user: {response.text}")
+
+        # Clear captured faces
+        self.captured_faces = []
+        self.index_button.config(state=tk.DISABLED)
+        logger.info("Captured faces cleared and index button disabled")
 
     def index_face(self):
+        logger.info("Indexing face")
         passenger_name = self.passenger_name_entry.get()
         if not passenger_name:
             messagebox.showerror("Error", "Passenger name cannot be empty.")
@@ -176,13 +286,16 @@ class FaceRecognitionApp:
             messagebox.showerror("Error", f"Failed to index face: {response.text}")
 
     def recognize_face(self):
+        logger.info("Recognizing face")
         if self.frame is None:
+            logger.error("No image captured")
             messagebox.showerror("Error", "No image captured.")
             return
 
         # Use a generic name for recognition images
         image_path = os.path.join("users", "recognition_image.jpg")
         cv2.imwrite(image_path, cv2.cvtColor(self.frame, cv2.COLOR_RGB2BGR))
+        logger.info(f"Saved recognition image: {image_path}")
 
         with open(image_path, "rb") as image_file:
             image_bytes = image_file.read()
@@ -190,25 +303,58 @@ class FaceRecognitionApp:
         image_base64 = base64.b64encode(image_bytes).decode("utf-8")
         payload = {"image": image_base64}
 
+        logger.info(f"Sending recognition request to {API_ENDPOINT}/recognize")
         response = requests.post(f"{API_ENDPOINT}/recognize", json=payload)
 
         if response.status_code == 200:
             result = response.json()
+            logger.info("Face recognized:")
+            logger.info(json.dumps(result, indent=2))
             print("Face recognized:")
             print(json.dumps(result, indent=2))
             messagebox.showinfo("Recognition Result", json.dumps(result, indent=2))
         elif response.status_code == 404:
+            logger.warning(
+                "No matching face found or no passenger data associated with the face"
+            )
             messagebox.showinfo(
                 "Result",
                 "No matching face found or no passenger data associated with the face.",
             )
         else:
+            logger.error(f"Error: {response.status_code} - {response.text}")
             messagebox.showerror(
                 "Error", f"Error: {response.status_code} - {response.text}"
             )
 
+    def remove_all_faces(self):
+        logger.info("Removing all faces")
+        if messagebox.askyesno(
+            "Confirm",
+            "Are you sure you want to remove all registered faces? This action cannot be undone.",
+        ):
+            try:
+                response = requests.post(f"{API_ENDPOINT}/remove_all_faces")
+                if response.status_code == 200:
+                    logger.info("All faces removed successfully")
+                    messagebox.showinfo(
+                        "Success", "All registered faces have been removed."
+                    )
+                else:
+                    logger.error(f"Failed to remove faces: {response.text}")
+                    messagebox.showerror(
+                        "Error", f"Failed to remove faces: {response.text}"
+                    )
+            except requests.RequestException as e:
+                logger.error(f"Error connecting to the server: {str(e)}")
+                messagebox.showerror(
+                    "Error", f"Error connecting to the server: {str(e)}"
+                )
+
 
 if __name__ == "__main__":
+    logger.info("Starting FaceRecognitionApp")
     root = tk.Tk()
     app = FaceRecognitionApp(root)
     root.mainloop()
+    logger.info("FaceRecognitionApp closed")

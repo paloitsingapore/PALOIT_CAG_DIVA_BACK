@@ -48,25 +48,27 @@ def handler(event, context):
         s3.delete_object(Bucket=bucket_name, Key=s3_key)
 
         if search_response["FaceMatches"]:
-            face_id = search_response["FaceMatches"][0]["Face"]["FaceId"]
+            face_match = search_response["FaceMatches"][0]
+            face_id = face_match["Face"]["FaceId"]
+            similarity = face_match["Similarity"]
 
-            # Get passengerId using the new function
-            passenger_id = get_passenger_id_from_face_id(face_id, table)
-
-            if passenger_id:
-                response = table.get_item(Key={"passengerId": passenger_id})
-
-                if "Item" in response:
-                    passenger_data = response["Item"]
-                    return {
-                        "statusCode": 200,
-                        "body": json.dumps(
-                            {
-                                "message": "Face recognized",
-                                "passengerData": passenger_data,
-                            }
-                        ),
-                    }
+            # Query DynamoDB
+            response = table.scan(
+                FilterExpression=boto3.dynamodb.conditions.Attr("faceIds").contains(
+                    face_id
+                )
+            )
+            if response["Items"]:
+                user_data = response["Items"][0]
+                return {
+                    "statusCode": 200,
+                    "body": json.dumps(
+                        {
+                            "message": "Face recognized",
+                            "passengerData": user_data,
+                        }
+                    ),
+                }
 
             return {
                 "statusCode": 404,
