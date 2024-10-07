@@ -30,6 +30,11 @@ def handler(event, context):
     try:
         # Extract base64-encoded image from the event
         body = json.loads(event["body"])
+        if "image" not in body:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing 'image' in request body"}),
+            }
         image_bytes = base64.b64decode(body["image"])
 
         # Upload image to S3 temporarily
@@ -82,9 +87,20 @@ def handler(event, context):
                 "body": json.dumps({"message": "No matching face found"}),
             }
 
+    except json.JSONDecodeError:
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"error": "Invalid JSON in request body"}),
+        }
     except ClientError as e:
         print(f"Error: {str(e)}")
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": "An unexpected error occurred"}),
+        }
 
 
 def get_passenger_id_from_face_id(face_id, table):

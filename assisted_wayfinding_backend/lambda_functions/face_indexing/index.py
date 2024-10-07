@@ -9,35 +9,35 @@ from botocore.exceptions import ClientError
 def handler(event, context):
     print("Face Indexing Lambda function invoked")
 
-    # Get environment variables
-    table_name = os.environ.get("DYNAMODB_TABLE_NAME")
-    collection_id = os.environ.get("REKOGNITION_COLLECTION_ID")
-    bucket_name = os.environ.get("S3_BUCKET_NAME")
-
-    if not table_name or not collection_id or not bucket_name:
-        missing_vars = []
-        if not table_name:
-            missing_vars.append("DYNAMODB_TABLE_NAME")
-        if not collection_id:
-            missing_vars.append("REKOGNITION_COLLECTION_ID")
-        if not bucket_name:
-            missing_vars.append("S3_BUCKET_NAME")
-
-        error_message = (
-            f"Missing required environment variables: {', '.join(missing_vars)}"
-        )
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": error_message}),
-        }
-
-    # Initialize AWS clients
-    dynamodb = boto3.resource("dynamodb")
-    rekognition = boto3.client("rekognition")
-    s3 = boto3.client("s3")
-    table = dynamodb.Table(table_name)
-
     try:
+        # Get environment variables
+        table_name = os.environ.get("DYNAMODB_TABLE_NAME")
+        collection_id = os.environ.get("REKOGNITION_COLLECTION_ID")
+        bucket_name = os.environ.get("S3_BUCKET_NAME")
+
+        if not table_name or not collection_id or not bucket_name:
+            missing_vars = []
+            if not table_name:
+                missing_vars.append("DYNAMODB_TABLE_NAME")
+            if not collection_id:
+                missing_vars.append("REKOGNITION_COLLECTION_ID")
+            if not bucket_name:
+                missing_vars.append("S3_BUCKET_NAME")
+
+            error_message = (
+                f"Missing required environment variables: {', '.join(missing_vars)}"
+            )
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"error": error_message}),
+            }
+
+        # Initialize AWS clients
+        dynamodb = boto3.resource("dynamodb")
+        rekognition = boto3.client("rekognition")
+        s3 = boto3.client("s3")
+        table = dynamodb.Table(table_name)
+
         # Extract data from the event
         body = json.loads(event["body"])
         user_id = body["userId"]

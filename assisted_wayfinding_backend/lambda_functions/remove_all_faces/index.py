@@ -27,9 +27,12 @@ def handler(event, context):
 
         # Remove all items from DynamoDB table
         scan = table.scan()
-        with table.batch_writer() as batch:
-            for item in scan["Items"]:
-                batch.delete_item(Key={"userId": item["userId"]})
+        items = scan["Items"]
+
+        if items:
+            with table.batch_writer() as batch:
+                for item in items:
+                    batch.delete_item(Key={"userId": item["userId"]})
 
         return {
             "statusCode": 200,
