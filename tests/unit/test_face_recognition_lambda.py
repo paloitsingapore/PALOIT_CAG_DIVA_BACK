@@ -1,161 +1,202 @@
+# tests/unit/test_face_recognition_lambda.py
+
 import base64
 import json
-import os
 from unittest.mock import MagicMock, patch
 
-import boto3
 import pytest
-from moto import mock_dynamodb, mock_rekognition
+from botocore.exceptions import ClientError
 
-from assisted_wayfinding_backend.lambda_functions.face_recognition import index
-
-
-@pytest.fixture
-def aws_credentials():
-    """Mocked AWS Credentials for moto."""
-    os.environ["AWS_ACCESS_KEY_ID"] = "testing"
-    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
-    os.environ["AWS_SECURITY_TOKEN"] = "testing"
-    os.environ["AWS_SESSION_TOKEN"] = "testing"
-    os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
+from assisted_wayfinding_backend.lambda_functions.face_recognition.index import (
+    handler as recognition_handler,
+)
 
 
 @pytest.fixture
-def dynamodb_table(aws_credentials):
-    with mock_dynamodb():
-        dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
-        table_name = "TestPassengerTable"
-        table = dynamodb.create_table(
-            TableName=table_name,
-            KeySchema=[{"AttributeName": "faceId", "KeyType": "HASH"}],
-            AttributeDefinitions=[{"AttributeName": "faceId", "AttributeType": "S"}],
-            BillingMode="PAY_PER_REQUEST",
-        )
+def mock_environment(monkeypatch):
+    """Fixture to mock environment variables."""
+    monkeypatch.setenv("DYNAMODB_TABLE_NAME", "test-table")
+    monkeypatch.setenv("REKOGNITION_COLLECTION_ID", "test-collection")
+    monkeypatch.setenv("S3_BUCKET_NAME", "test-bucket")
 
-        # Insert test data
-        table.put_item(
-            Item={
-                "faceId": "test_face_id",
-                "passengerId": "test_passenger_id",
-                "name": "John Doe",
-                "passportNumber": "AB1234567",
+
+@pytest.fixture
+def test_images():
+    """Fixture to load and provide test images."""
+    with open("tests/unit/images/test_fake_person.jpg", "rb") as f:
+        fake_person_image = base64.b64encode(f.read()).decode("utf-8")
+    with open("tests/unit/images/test_no_face.jpg", "rb") as f:
+        no_face_image = base64.b64encode(f.read()).decode("utf-8")
+    return {"fake_person_image": fake_person_image, "no_face_image": no_face_image}
+
+
+@pytest.fixture
+def mock_context():
+    """Fixture to create a mock AWS Lambda context."""
+    context = MagicMock()
+    context.aws_request_id = "test-request-id"
+    return context
+
+
+@pytest.fixture
+def mock_boto3_clients():
+    """Fixture to mock boto3 clients and resources."""
+    with patch("boto3.resource") as mock_resource, patch("boto3.client") as mock_client:
+        yield mock_resource, mock_client
+
+
+def test_face_recognition_success(
+    mock_environment, mock_boto3_clients, mock_context, test_images
+):
+    """
+    Test successful face recognition where a face is matched and passenger data is retrieved.
+    """
+    mock_resource, mock_client = mock_boto3_clients
+    mock_table = MagicMock()
+    mock_resource.return_value.Table.return_value = mock_table
+    mock_rekognition = mock_client.return_value
+    mock_s3 = mock_client.return_value
+
+    event = {"body": json.dumps({"image": test_images["fake_person_image"]})}
+
+    mock_rekognition.search_faces_by_image.return_value = {
+        "FaceMatches": [
+            {
+                "Face": {"FaceId": "test-face-id"},
+                "Similarity": 99.0,
             }
-        )
+        ]
+    }
 
-        yield table_name
+    mock_table.scan.return_value = {
+        "Items": [
+            {
+                "userId": "P12345",
+                "name": "fake person",
+                "faceIds": ["test-face-id"],
+            }
+        ]
+    }
 
+    response = recognition_handler(event, mock_context)
 
-@pytest.fixture
-def rekognition_collection(aws_credentials):
-    with mock_rekognition():
-        rekognition = boto3.client("rekognition", region_name="us-east-1")
-        collection_id = "TestFaceCollection"
-        rekognition.create_collection(CollectionId=collection_id)
-        yield collection_id
-
-
-def test_face_recognition_lambda_handler(dynamodb_table, rekognition_collection):
-    # Set environment variables
-    os.environ["DYNAMODB_TABLE_NAME"] = dynamodb_table
-    os.environ["REKOGNITION_COLLECTION_ID"] = rekognition_collection
-
-    # Mock the Rekognition search_faces_by_image method
-    with patch("boto3.client") as mock_boto3_client:
-        mock_rekognition = MagicMock()
-        mock_rekognition.search_faces_by_image.return_value = {
-            "FaceMatches": [
-                {
-                    "Face": {"FaceId": "test_face_id", "Confidence": 99.9},
-                    "Similarity": 99.9,
-                }
-            ]
-        }
-        mock_boto3_client.return_value = mock_rekognition
-
-        # Test event
-        event = {
-            "body": json.dumps(
-                {"image": base64.b64encode(b"fake_image_data").decode("utf-8")}
-            )
-        }
-        context = {}
-
-        # Call the handler function
-        response = index.handler(event, context)
-
-        # Assert the response
-        assert response["statusCode"] == 200
-        body = json.loads(response["body"])
-        assert body["message"] == "Face recognized"
-        assert body["passengerData"]["passengerId"] == "test_passenger_id"
-        assert body["passengerData"]["name"] == "John Doe"
-        assert body["passengerData"]["passportNumber"] == "AB1234567"
+    assert response["statusCode"] == 200
+    body = json.loads(response["body"])
+    assert "Face recognized" in body["message"]
+    assert body["passengerData"]["name"] == "fake person"
 
 
-def test_face_recognition_no_match(dynamodb_table, rekognition_collection):
-    # Set environment variables
-    os.environ["DYNAMODB_TABLE_NAME"] = dynamodb_table
-    os.environ["REKOGNITION_COLLECTION_ID"] = rekognition_collection
+def test_face_recognition_no_face(
+    mock_environment, mock_boto3_clients, mock_context, test_images
+):
+    """
+    Test face recognition when no face is detected in the image.
+    """
+    mock_resource, mock_client = mock_boto3_clients
+    mock_rekognition = mock_client.return_value
 
-    # Mock the Rekognition search_faces_by_image method
-    with patch("boto3.client") as mock_boto3_client:
-        mock_rekognition = MagicMock()
-        mock_rekognition.search_faces_by_image.return_value = {"FaceMatches": []}
-        mock_boto3_client.return_value = mock_rekognition
+    event = {"body": json.dumps({"image": test_images["no_face_image"]})}
 
-        # Test event
-        event = {
-            "body": json.dumps(
-                {"image": base64.b64encode(b"fake_image_data").decode("utf-8")}
-            )
-        }
-        context = {}
+    mock_rekognition.search_faces_by_image.return_value = {"FaceMatches": []}
 
-        # Call the handler function
-        response = index.handler(event, context)
+    response = recognition_handler(event, mock_context)
 
-        # Assert the response
-        assert response["statusCode"] == 404
-        body = json.loads(response["body"])
-        assert body["message"] == "No matching face found"
+    assert response["statusCode"] == 404
+    assert "No matching face found" in json.loads(response["body"])["message"]
 
 
-def test_face_recognition_error(dynamodb_table, rekognition_collection):
-    # Set environment variables
-    os.environ["DYNAMODB_TABLE_NAME"] = dynamodb_table
-    os.environ["REKOGNITION_COLLECTION_ID"] = rekognition_collection
+def test_face_recognition_no_passenger_data(
+    mock_environment, mock_boto3_clients, mock_context, test_images
+):
+    """
+    Test behavior when a face is matched but no passenger data is found.
+    """
+    mock_resource, mock_client = mock_boto3_clients
+    mock_table = MagicMock()
+    mock_resource.return_value.Table.return_value = mock_table
+    mock_rekognition = mock_client.return_value
 
-    # Mock the Rekognition search_faces_by_image method to raise an exception
-    with patch("boto3.client") as mock_boto3_client:
-        mock_rekognition = MagicMock()
-        mock_rekognition.search_faces_by_image.side_effect = Exception(
-            "Rekognition error"
-        )
-        mock_boto3_client.return_value = mock_rekognition
+    event = {"body": json.dumps({"image": test_images["fake_person_image"]})}
 
-        # Test event
-        event = {
-            "body": json.dumps(
-                {"image": base64.b64encode(b"fake_image_data").decode("utf-8")}
-            )
-        }
-        context = {}
+    mock_rekognition.search_faces_by_image.return_value = {
+        "FaceMatches": [
+            {
+                "Face": {"FaceId": "test-face-id"},
+                "Similarity": 99.0,
+            }
+        ]
+    }
 
-        # Call the handler function
-        response = index.handler(event, context)
+    mock_table.scan.return_value = {"Items": []}
 
-        # Assert the response
-        assert response["statusCode"] == 500
-        body = json.loads(response["body"])
-        assert "error" in body
+    response = recognition_handler(event, mock_context)
+
+    assert response["statusCode"] == 404
+    assert (
+        "No passenger data found for the recognized face"
+        in json.loads(response["body"])["message"]
+    )
 
 
-# Clean up environment variables after tests
-def teardown_module(module):
-    os.environ.pop("DYNAMODB_TABLE_NAME", None)
-    os.environ.pop("REKOGNITION_COLLECTION_ID", None)
-    os.environ.pop("AWS_ACCESS_KEY_ID", None)
-    os.environ.pop("AWS_SECRET_ACCESS_KEY", None)
-    os.environ.pop("AWS_SECURITY_TOKEN", None)
-    os.environ.pop("AWS_SESSION_TOKEN", None)
-    os.environ.pop("AWS_DEFAULT_REGION", None)
+def test_face_recognition_dynamodb_error(
+    mock_environment, mock_boto3_clients, mock_context, test_images
+):
+    """Test behavior when DynamoDB query fails."""
+    mock_resource, mock_client = mock_boto3_clients
+    mock_table = MagicMock()
+    mock_resource.return_value.Table.return_value = mock_table
+    mock_rekognition = mock_client.return_value
+
+    event = {"body": json.dumps({"image": test_images["fake_person_image"]})}
+
+    mock_rekognition.search_faces_by_image.return_value = {
+        "FaceMatches": [
+            {
+                "Face": {"FaceId": "test-face-id"},
+                "Similarity": 99.0,
+            }
+        ]
+    }
+
+    mock_table.scan.side_effect = ClientError(
+        {"Error": {"Code": "ResourceNotFoundException", "Message": "Table not found"}},
+        "Scan",
+    )
+
+    response = recognition_handler(event, mock_context)
+
+    assert response["statusCode"] == 500
+    assert "Table not found" in json.loads(response["body"])["error"]
+
+
+def test_face_recognition_missing_env_vars():
+    """Test behavior when environment variables are missing."""
+    with patch.dict("os.environ", {}, clear=True):
+        event = {"body": json.dumps({"image": "dummy_image"})}
+        response = recognition_handler(event, MagicMock())
+
+    assert response["statusCode"] == 500
+    assert (
+        "Missing required environment variables"
+        in json.loads(response["body"])["error"]
+    )
+
+
+def test_face_recognition_invalid_input(mock_environment, mock_context):
+    """Test behavior with invalid input (missing image)."""
+    event = {"body": json.dumps({})}  # Missing 'image' key
+
+    response = recognition_handler(event, mock_context)
+
+    assert response["statusCode"] == 400
+    assert "Missing 'image' in request body" in json.loads(response["body"])["error"]
+
+
+def test_face_recognition_invalid_json(mock_environment, mock_context):
+    """Test behavior with invalid JSON in request body."""
+    event = {"body": "invalid json"}
+
+    response = recognition_handler(event, mock_context)
+
+    assert response["statusCode"] == 400
+    assert "Invalid JSON in request body" in json.loads(response["body"])["error"]
