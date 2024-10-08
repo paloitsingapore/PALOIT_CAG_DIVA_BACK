@@ -12,61 +12,45 @@ participant "Face Recognition Lambda" as LambdaFR
 participant "Amazon Rekognition" as Rekognition
 participant "DynamoDB" as DynamoDB
 participant "S3 Bucket" as S3
-participant "Flight Info Lambda" as LambdaFI
 end box
 
-App -> App: Detect face using Google ML Toolkit
-activate App
-
-App -> API: Send captured face image
+App -> API: Send captured face image (base64)
 activate API
 
 API -> LambdaFR: Trigger face recognition
 activate LambdaFR
 
-LambdaFR -> Rekognition: Request facial analysis
-activate Rekognition
-Rekognition --> LambdaFR: Return facial analysis results
-deactivate Rekognition
-
-LambdaFR -> DynamoDB: Query passenger list
-activate DynamoDB
-DynamoDB --> LambdaFR: Return passenger data and S3 photo references
-deactivate DynamoDB
-
-LambdaFR -> S3: Retrieve passenger photos
+LambdaFR -> S3: Upload temporary image
 activate S3
-S3 --> LambdaFR: Return passenger photos
+S3 --> LambdaFR: Confirm upload
 deactivate S3
 
-LambdaFR -> Rekognition: Compare captured face with passenger photos
+LambdaFR -> Rekognition: Search faces by image
 activate Rekognition
-Rekognition --> LambdaFR: Return face comparison results
+Rekognition --> LambdaFR: Return face matches
 deactivate Rekognition
 
-alt Face matched
-    LambdaFR -> LambdaFI: Trigger flight info retrieval for matched passenger
-    activate LambdaFI
+LambdaFR -> S3: Delete temporary image
+activate S3
+S3 --> LambdaFR: Confirm deletion
+deactivate S3
 
-    LambdaFI -> DynamoDB: Query flight information
+alt Face matched
+    LambdaFR -> DynamoDB: Query passenger data
     activate DynamoDB
-    DynamoDB --> LambdaFI: Return flight details
+    DynamoDB --> LambdaFR: Return passenger data
     deactivate DynamoDB
 
-    LambdaFI --> LambdaFR: Return flight information
-    deactivate LambdaFI
-
-    LambdaFR --> API: Return matched passenger and flight information
+    LambdaFR --> API: Return passenger data
 else No match found
     LambdaFR --> API: Return no match found
 end
 
 deactivate LambdaFR
 
-API --> App: Return result (passenger and flight information or no match)
+API --> App: Return result (passenger data or no match)
 deactivate API
 
 App -> App: Display result
-deactivate App
 
 @enduml
