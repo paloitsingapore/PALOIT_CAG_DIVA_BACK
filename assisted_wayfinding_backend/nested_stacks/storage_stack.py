@@ -1,9 +1,7 @@
 from aws_cdk import (
     NestedStack,
     RemovalPolicy,
-)
-from aws_cdk import aws_rekognition as rekognition
-from aws_cdk import (
+    aws_rekognition as rekognition,
     aws_s3 as s3,
 )
 from constructs import Construct

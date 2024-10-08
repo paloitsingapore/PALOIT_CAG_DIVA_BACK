@@ -1,7 +1,5 @@
 from aws_cdk import (
     Stack,
-)
-from aws_cdk import (
     aws_apigateway as apigw,
 )
 from constructs import Construct

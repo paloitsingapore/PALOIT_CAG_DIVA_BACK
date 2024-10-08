@@ -1,8 +1,8 @@
 import json
 import unittest
 from unittest.mock import MagicMock, patch
-import os
-from botocore.exceptions import ClientError, ParamValidationError
+
+from botocore.exceptions import ClientError
 
 from assisted_wayfinding_backend.lambda_functions.remove_all_faces.index import handler
 
@@ -125,8 +125,13 @@ class TestRemoveAllFaces(unittest.TestCase):
     def test_remove_all_faces_rekognition_error(self, mock_client, mock_resource):
         mock_rekognition = mock_client.return_value
         mock_rekognition.list_faces.side_effect = ClientError(
-            {"Error": {"Code": "InvalidParameterException", "Message": "Invalid collection id"}},
-            "ListFaces"
+            {
+                "Error": {
+                    "Code": "InvalidParameterException",
+                    "Message": "Invalid collection id",
+                }
+            },
+            "ListFaces",
         )
 
         response = handler({}, {})
