@@ -1,0 +1,56 @@
+@startuml Assisted Wayfinding
+skinparam sequenceMessageAlign center
+skinparam boxPadding 10
+
+box "Client Side" #LightBlue
+participant "Airport Kiosk App" as App
+end box
+
+box "AWS Cloud" #LightYellow
+participant "API Gateway" as API
+participant "Face Recognition Lambda" as LambdaFR
+participant "Amazon Rekognition" as Rekognition
+participant "DynamoDB" as DynamoDB
+participant "S3 Bucket" as S3
+end box
+
+App -> API: Send captured face image (base64)
+activate API
+
+API -> LambdaFR: Trigger face recognition
+activate LambdaFR
+
+LambdaFR -> S3: Upload temporary image
+activate S3
+S3 --> LambdaFR: Confirm upload
+deactivate S3
+
+LambdaFR -> Rekognition: Search faces by image
+activate Rekognition
+Rekognition --> LambdaFR: Return face matches
+deactivate Rekognition
+
+LambdaFR -> S3: Delete temporary image
+activate S3
+S3 --> LambdaFR: Confirm deletion
+deactivate S3
+
+alt Face matched
+    LambdaFR -> DynamoDB: Query passenger data
+    activate DynamoDB
+    DynamoDB --> LambdaFR: Return passenger data
+    deactivate DynamoDB
+
+    LambdaFR --> API: Return passenger data
+else No match found
+    LambdaFR --> API: Return no match found
+end
+
+deactivate LambdaFR
+
+API --> App: Return result (passenger data or no match)
+deactivate API
+
+App -> App: Display result
+
+@enduml
