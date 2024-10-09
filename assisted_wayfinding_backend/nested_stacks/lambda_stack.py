@@ -1,4 +1,5 @@
 from aws_cdk import (
+    CfnOutput,
     Duration,
     NestedStack,
     aws_iam as iam,
@@ -162,6 +163,36 @@ class LambdaStack(NestedStack):
                 ],
                 resources=[
                     f"arn:aws:dynamodb:{self.region}:{self.account}:table/{config['dynamodb_table_name']}"
+                ],
+            )
+        )
+
+        # Add the Directions Lambda function
+        self.directions_function = _lambda.Function(
+            self,
+            "DirectionsFunction",
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            handler="index.handler",
+            code=_lambda.Code.from_asset(
+                "assisted_wayfinding_backend/lambda_functions/directions"
+            ),
+            environment={
+                "MAP_IMAGE_BUCKET": config["map_image_bucket"],
+            },
+        )
+        CfnOutput(self, "MapImageBucketName", value=config["map_image_bucket"])
+
+        # Add S3 read permissions for the Directions function
+        self.directions_function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:ListBucket",
+                    "s3:GetBucketLocation",
+                ],
+                resources=[
+                    f"arn:aws:s3:::{config['map_image_bucket']}",
+                    f"arn:aws:s3:::{config['map_image_bucket']}/*",
                 ],
             )
         )

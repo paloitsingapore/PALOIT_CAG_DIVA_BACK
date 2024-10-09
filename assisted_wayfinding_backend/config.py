@@ -8,7 +8,8 @@ def get_config(env: str) -> Dict[str, Any]:
         "lambda_handler": "index.handler",
         "environment": env,
         "rekognition_collection_id": "AssistedWayfindingFaces",
-        "s3_bucket_name": f"AssistedWayfinding-passenger-photos-{env}",
+        "s3_bucket_name": f"assistedwayfinding-passenger-photos-{env}",
+        "MAP_IMAGE_BUCKET": f"assistedwayfinding-map-images-{env}",
     }
 
     env_specific_config = {

@@ -30,6 +30,7 @@ class AssistedWayfindingBackendStack(Stack):
             {
                 "rekognition_collection_id": "AssistedWayfindingFaces",
                 "s3_bucket_name": storage_stack.passenger_photos_bucket.bucket_name,
+                "map_image_bucket": storage_stack.map_images_bucket.bucket_name,  # Add this line
                 "dynamodb_table_name": dynamodb_stack.table_name,  # Use the table_name property
             }
         )
@@ -80,3 +81,11 @@ class AssistedWayfindingBackendStack(Stack):
         api.root.add_resource("remove_all_faces").add_method(
             "POST", remove_all_faces_integration
         )
+
+        directions_integration = apigw.LambdaIntegration(
+            lambda_stack.directions_function
+        )
+        directions_resource = api.root.add_resource("directions")
+        from_resource = directions_resource.add_resource("{from}")
+        to_resource = from_resource.add_resource("{to}")
+        to_resource.add_method("GET", directions_integration)
