@@ -29,31 +29,47 @@ def handle_request(req):
     print('Conv request:', req)
 
     input_text = req.get('input', {}).get('text', '')
+    persona_id = req.get('personaId')
+
+    # Call the get_passenger_data Lambda function
+    passenger_data_response = call_get_passenger_data_lambda(persona_id)
+
+    # Use the passenger data response as context for the chat
+    context = generate_context(passenger_data_response)
+
     resp = {
         'input': {'text': input_text},
-        'output': {'text': f"Echo: {input_text}"},
+        'output': {'text': generate_response(input_text, context)},
         'variables': {}
     }
 
     optional_args = req.get('optionalArgs', {})
     if optional_args.get('kind') == 'init':
-        resp['output']['text'] = 'Hi there!'
-
-    if input_text.lower().startswith('why'):
-        resp['output']['text'] = 'I do not know how to answer that'
-        resp['fallback'] = True
-
-    if input_text.lower() == 'show card':
-        resp['output']['text'] = 'Here is a cat @showcards(cat)'
-        resp['variables']['public-cat'] = {
-            'component': 'image',
-            'data': {
-                'alt': 'A cute kitten',
-                'url': 'https://placekitten.com/300/300'
-            }
-        }
+        resp['output']['text'] = f"Hi there, {context['name']}!"
 
     return resp
+
+def call_get_passenger_data_lambda(persona_id):
+    lambda_client = boto3.client('lambda')
+    response = lambda_client.invoke(
+        FunctionName='get_passenger_data_lambda',
+        InvocationType='RequestResponse',
+        Payload=json.dumps({'personaId': persona_id})
+    )
+    return json.loads(response['Payload'].read())
+
+def generate_context(passenger_data_response):
+    passenger_data = passenger_data_response.get('passengerData', {})
+    return {
+        'name': passenger_data.get('name', 'Guest'),
+        'gender': passenger_data.get('gender', 'Unknown'),
+        'age': passenger_data.get('age', 'Unknown'),
+        'userId': passenger_data.get('userId', 'Unknown')
+    }
+
+def generate_response(input_text, context):
+    # TODO: Implement more sophisticated response generation using the context
+    return f"Hello {context['name']}, how can I assist you today?"
 
 def send_message(api_client, connection_id, resp):
     message = {

@@ -184,3 +184,42 @@ class LambdaStack(NestedStack):
             actions=["execute-api:ManageConnections"],
             resources=[f"arn:aws:execute-api:{self.region}:{self.account}:*/*/*/*"]
         ))
+
+        # Add the new get_passenger_data Lambda function
+        self.get_passenger_data_function = _lambda.Function(
+            self,
+            "GetPassengerDataFunction",
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            handler="index.handler",
+            code=_lambda.Code.from_asset(
+                "assisted_wayfinding_backend/lambda_functions/get_passenger_data"
+            ),
+            memory_size=config["lambda_memory_size"],
+            timeout=Duration.seconds(config["lambda_timeout"]),
+            environment={
+                "DYNAMODB_TABLE_NAME": f"{config['project_name']}-PassengerTable-{config['environment']}",
+                "REKOGNITION_COLLECTION_ID": config["rekognition_collection_id"],
+                "PROJECT_NAME": config["project_name"],
+                "ENVIRONMENT": config["environment"],
+            },
+        )
+
+        # Add DynamoDB permissions to the get_passenger_data function
+        dynamodb_policy = iam.PolicyStatement(
+            actions=[
+                "dynamodb:GetItem",
+                "dynamodb:Query",
+            ],
+            resources=[
+                f"arn:aws:dynamodb:{self.region}:{self.account}:table/{config['dynamodb_table_name']}"
+            ],
+        )
+        self.get_passenger_data_function.add_to_role_policy(dynamodb_policy)
+
+        # Update the orchestration function to allow invoking the get_passenger_data function
+        self.orchestration_function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["lambda:InvokeFunction"],
+                resources=[self.get_passenger_data_function.function_arn]
+            )
+        )
