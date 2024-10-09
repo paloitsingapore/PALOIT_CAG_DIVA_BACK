@@ -18,9 +18,7 @@ class StorageStack(NestedStack):
             self,
             "PassengerPhotosBucket",
             bucket_name=f"{config['project_name']}-passenger-photos-{config['environment']}".lower(),
-            removal_policy=RemovalPolicy.DESTROY
-            if config["environment"] == "dev"
-            else RemovalPolicy.RETAIN,
+            removal_policy=RemovalPolicy.DESTROY if config["environment"] == "dev" else RemovalPolicy.RETAIN,
             auto_delete_objects=True if config["environment"] == "dev" else False,
         )
         # Create Rekognition collection

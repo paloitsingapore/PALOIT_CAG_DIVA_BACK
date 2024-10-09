@@ -9,6 +9,7 @@ def get_config(env: str) -> Dict[str, Any]:
         "environment": env,
         "rekognition_collection_id": "AssistedWayfindingFaces",
         "s3_bucket_name": f"AssistedWayfinding-passenger-photos-{env}",
+        'websocket_api_endpoint': '',  # This will be updated during deployment
     }
 
     env_specific_config = {

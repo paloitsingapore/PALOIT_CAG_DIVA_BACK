@@ -7,6 +7,7 @@ from constructs import Construct
 from .nested_stacks.dynamodb_stack import DynamoDBStack
 from .nested_stacks.lambda_stack import LambdaStack
 from .nested_stacks.storage_stack import StorageStack
+from .nested_stacks.websocket_api_stack import WebSocketApiStack
 
 
 class AssistedWayfindingBackendStack(Stack):
@@ -79,4 +80,18 @@ class AssistedWayfindingBackendStack(Stack):
 
         api.root.add_resource("remove_all_faces").add_method(
             "POST", remove_all_faces_integration
+        )
+
+        # Create the WebSocket API nested stack
+        websocket_api_stack = WebSocketApiStack(
+            self, f"{config['project_name']}WebSocketApiStack",
+            orchestration_function=lambda_stack.orchestration_function
+        )
+
+        # # Update config with WebSocket API endpoint
+        config['websocket_api_endpoint'] = websocket_api_stack.websocket_stage.url
+
+        # # Update Lambda environment with WebSocket API endpoint
+        lambda_stack.orchestration_function.add_environment(
+            "WEBSOCKET_API_ENDPOINT", config['websocket_api_endpoint']
         )

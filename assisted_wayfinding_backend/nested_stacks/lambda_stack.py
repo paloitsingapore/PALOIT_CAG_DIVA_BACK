@@ -85,7 +85,7 @@ class LambdaStack(NestedStack):
             actions=[
                 "s3:PutObject",
                 "s3:GetObject",
-                "s3:DeleteObject",  # Add this line
+                "s3:DeleteObject",
             ],
             resources=[
                 f"arn:aws:s3:::{config['s3_bucket_name']}/*",
@@ -158,10 +158,29 @@ class LambdaStack(NestedStack):
                 actions=[
                     "dynamodb:Scan",
                     "dynamodb:DeleteItem",
-                    "dynamodb:BatchWriteItem",  # Add this line
+                    "dynamodb:BatchWriteItem",
                 ],
                 resources=[
                     f"arn:aws:dynamodb:{self.region}:{self.account}:table/{config['dynamodb_table_name']}"
                 ],
             )
         )
+
+        # Create a Lambda function for orchestration
+        self.orchestration_function = _lambda.Function(
+            self, "OrchestrationFunction",
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            handler="index.handler",
+            code=_lambda.Code.from_asset("assisted_wayfinding_backend/lambda_functions/orchestration"),
+            memory_size=config['lambda_memory_size'],
+            timeout=Duration.seconds(config['lambda_timeout']),
+            environment={
+                "WEBSOCKET_API_ENDPOINT": config['websocket_api_endpoint'],
+            }
+        )
+
+        # Grant permissions to use API Gateway Management API
+        self.orchestration_function.add_to_role_policy(iam.PolicyStatement(
+            actions=["execute-api:ManageConnections"],
+            resources=[f"arn:aws:execute-api:{self.region}:{self.account}:*/*/*/*"]
+        ))
