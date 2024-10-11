@@ -196,3 +196,20 @@ class LambdaStack(NestedStack):
                 ],
             )
         )
+
+        # Add the manual user lookup function
+        self.manual_user_lookup_function = _lambda.Function(
+            self,
+            "ManualUserLookupFunction",
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            handler="index.handler",
+            code=_lambda.Code.from_asset(
+                "assisted_wayfinding_backend/lambda_functions/manual_user_lookup"
+            ),
+            environment={
+                "DYNAMODB_TABLE_NAME": config["dynamodb_table"].table_name,
+            },
+        )
+
+        # Grant DynamoDB read permissions to the manual user lookup function
+        config["dynamodb_table"].grant_read_data(self.manual_user_lookup_function)

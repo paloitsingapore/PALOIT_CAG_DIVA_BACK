@@ -20,6 +20,9 @@ class AssistedWayfindingBackendStack(Stack):
             self, f"{config['project_name']}DynamoDBStack", config=config
         )
 
+        # Update config with the DynamoDB table
+        config["dynamodb_table"] = dynamodb_stack.table
+
         # Create the Storage nested stack
         storage_stack = StorageStack(
             self, f"{config['project_name']}StorageStack", config=config
@@ -89,3 +92,13 @@ class AssistedWayfindingBackendStack(Stack):
         from_resource = directions_resource.add_resource("{from}")
         to_resource = from_resource.add_resource("{to}")
         to_resource.add_method("GET", directions_integration)
+
+        # Add manual user lookup integration
+        manual_user_lookup_integration = apigw.LambdaIntegration(
+            lambda_stack.manual_user_lookup_function
+        )
+
+        # Add the /manual-lookup endpoint with GET method
+        api.root.add_resource("manual-lookup").add_method(
+            "GET", manual_user_lookup_integration
+        )

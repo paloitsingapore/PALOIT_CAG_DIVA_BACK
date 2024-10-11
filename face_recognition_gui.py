@@ -179,9 +179,14 @@ class FaceRecognitionApp:
     def index_user(self):
         logger.info("Indexing user")
         passenger_name = self.passenger_name_entry.get()
+        date_of_birth = self.date_of_birth_entry.get()
         if not passenger_name:
             logger.error("Passenger name is empty")
             messagebox.showerror("Error", "Passenger name cannot be empty.")
+            return
+        if not date_of_birth:
+            logger.error("Date of birth is empty")
+            messagebox.showerror("Error", "Date of birth cannot be empty.")
             return
 
         if not self.captured_faces:
@@ -198,11 +203,16 @@ class FaceRecognitionApp:
             "images": [],
             "passengerData": {
                 "name": passenger_name,
+                "dateOfBirth": date_of_birth,
                 "passengerId": f"passenger_{passenger_name.replace(' ', '_').lower()}",
                 "changi_app_user_id": f"CAU{random.randint(10000, 99999)}SQ",
                 "next_flight_id": f"SQ{random.randint(100, 999)}",
                 "has_lounge_access": self.has_lounge_access.get(),
-                "accessibility_needs": self.accessibility_needs.get(),
+                "accessibilityPreferences": {
+                    "increaseFontSize": self.increase_font_size.get(),
+                    "wheelchairAccessibility": self.wheelchair_accessibility.get(),
+                },
+                "language": self.language_entry.get(),
             },
         }
 
