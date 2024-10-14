@@ -1,4 +1,5 @@
 from aws_cdk import (
+    CfnOutput,
     Duration,
     NestedStack,
     aws_iam as iam,
@@ -165,3 +166,50 @@ class LambdaStack(NestedStack):
                 ],
             )
         )
+
+        # Add the Directions Lambda function
+        self.directions_function = _lambda.Function(
+            self,
+            "DirectionsFunction",
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            handler="index.handler",
+            code=_lambda.Code.from_asset(
+                "assisted_wayfinding_backend/lambda_functions/directions"
+            ),
+            environment={
+                "MAP_IMAGE_BUCKET": config["map_image_bucket"],
+            },
+        )
+        CfnOutput(self, "MapImageBucketName", value=config["map_image_bucket"])
+
+        # Add S3 read permissions for the Directions function
+        self.directions_function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:ListBucket",
+                    "s3:GetBucketLocation",
+                ],
+                resources=[
+                    f"arn:aws:s3:::{config['map_image_bucket']}",
+                    f"arn:aws:s3:::{config['map_image_bucket']}/*",
+                ],
+            )
+        )
+
+        # Add the manual user lookup function
+        self.manual_user_lookup_function = _lambda.Function(
+            self,
+            "ManualUserLookupFunction",
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            handler="index.handler",
+            code=_lambda.Code.from_asset(
+                "assisted_wayfinding_backend/lambda_functions/manual_user_lookup"
+            ),
+            environment={
+                "DYNAMODB_TABLE_NAME": config["dynamodb_table"].table_name,
+            },
+        )
+
+        # Grant DynamoDB read permissions to the manual user lookup function
+        config["dynamodb_table"].grant_read_data(self.manual_user_lookup_function)

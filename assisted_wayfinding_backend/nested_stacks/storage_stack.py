@@ -23,6 +23,13 @@ class StorageStack(NestedStack):
             else RemovalPolicy.RETAIN,
             auto_delete_objects=True if config["environment"] == "dev" else False,
         )
+        self.map_images_bucket = s3.Bucket(
+            self,
+            f"{config['project_name']}mapimagesbucket",
+            bucket_name=config["MAP_IMAGE_BUCKET"],
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True,
+        )
         # Create Rekognition collection
         self.face_collection = rekognition.CfnCollection(
             self, "FaceCollection", collection_id=config["rekognition_collection_id"]
