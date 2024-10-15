@@ -48,33 +48,38 @@ class FaceRecognitionApp:
         self.passenger_name_entry = tk.Entry(self.index_frame)
         self.passenger_name_entry.grid(row=0, column=1, columnspan=2, sticky="we")
 
+        # Add this after the passenger name entry
+        tk.Label(self.index_frame, text="Date of Birth:").grid(row=1, column=0, sticky="e")
+        self.date_of_birth_entry = tk.Entry(self.index_frame)
+        self.date_of_birth_entry.grid(row=1, column=1, columnspan=2, sticky="we")
+
         self.has_lounge_access = tk.BooleanVar()
         self.increase_font_size = tk.BooleanVar()
         self.wheelchair_accessibility = tk.BooleanVar()
 
         ttk.Checkbutton(
             self.index_frame, text="Lounge Access", variable=self.has_lounge_access
-        ).grid(row=1, column=0, columnspan=3, sticky="w")
+        ).grid(row=2, column=0, columnspan=3, sticky="w")
         ttk.Checkbutton(
             self.index_frame,
             text="Increase Font Size",
             variable=self.increase_font_size,
-        ).grid(row=2, column=0, columnspan=3, sticky="w")
+        ).grid(row=3, column=0, columnspan=3, sticky="w")
         ttk.Checkbutton(
             self.index_frame,
             text="Wheelchair Accessibility",
             variable=self.wheelchair_accessibility,
-        ).grid(row=3, column=0, columnspan=3, sticky="w")
+        ).grid(row=4, column=0, columnspan=3, sticky="w")
 
         # Add language field
-        tk.Label(self.index_frame, text="Language:").grid(row=4, column=0, sticky="e")
+        tk.Label(self.index_frame, text="Language:").grid(row=5, column=0, sticky="e")
         self.language_entry = tk.Entry(self.index_frame)
-        self.language_entry.grid(row=4, column=1, columnspan=2, sticky="we")
+        self.language_entry.grid(row=5, column=1, columnspan=2, sticky="we")
 
         self.capture_button = tk.Button(
             self.index_frame, text="Capture Face", command=self.capture_face
         )
-        self.capture_button.grid(row=5, column=0)
+        self.capture_button.grid(row=6, column=0)
 
         self.index_button = tk.Button(
             self.index_frame,
@@ -82,7 +87,7 @@ class FaceRecognitionApp:
             command=self.index_user,
             state=tk.DISABLED,
         )
-        self.index_button.grid(row=5, column=1)
+        self.index_button.grid(row=6, column=1)
 
         # Frame for recognizing face
         self.recognize_frame = tk.Frame(self.master)

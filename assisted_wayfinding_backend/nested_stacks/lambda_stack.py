@@ -198,22 +198,20 @@ class LambdaStack(NestedStack):
             memory_size=config["lambda_memory_size"],
             timeout=Duration.seconds(config["lambda_timeout"]),
             environment={
-                "DYNAMODB_TABLE_NAME": f"{config['project_name']}-PassengerTable-{config['environment']}",
+                "DYNAMODB_TABLE_NAME": config["dynamodb_table"].table_name,  # Use this instead
                 "REKOGNITION_COLLECTION_ID": config["rekognition_collection_id"],
                 "PROJECT_NAME": config["project_name"],
                 "ENVIRONMENT": config["environment"],
             },
         )
 
-        # Add DynamoDB permissions to the get_passenger_data function
+        # Update DynamoDB permissions for the get_passenger_data function
         dynamodb_policy = iam.PolicyStatement(
             actions=[
                 "dynamodb:GetItem",
                 "dynamodb:Query",
             ],
-            resources=[
-                f"arn:aws:dynamodb:{self.region}:{self.account}:table/{config['dynamodb_table_name']}"
-            ],
+            resources=[config["dynamodb_table"].table_arn],
         )
         self.get_passenger_data_function.add_to_role_policy(dynamodb_policy)
 

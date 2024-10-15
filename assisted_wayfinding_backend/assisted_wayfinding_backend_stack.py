@@ -92,6 +92,34 @@ class AssistedWayfindingBackendStack(Stack):
             "POST", remove_all_faces_integration
         )
 
+        # Add get passenger data integration
+        get_passenger_data_integration = apigw.LambdaIntegration(
+            lambda_stack.get_passenger_data_function
+        )
+
+        # Add the /passenger/{personaId} endpoint with GET method
+        passenger_resource = api.root.add_resource("passenger")
+        persona_id_resource = passenger_resource.add_resource("{personaId}")
+        persona_id_resource.add_method("GET", get_passenger_data_integration)
+
+        directions_integration = apigw.LambdaIntegration(
+            lambda_stack.directions_function
+        )
+        directions_resource = api.root.add_resource("directions")
+        from_resource = directions_resource.add_resource("{from}")
+        to_resource = from_resource.add_resource("{to}")
+        to_resource.add_method("GET", directions_integration)
+
+        # Add manual user lookup integration
+        manual_user_lookup_integration = apigw.LambdaIntegration(
+            lambda_stack.manual_user_lookup_function
+        )
+
+        # Add the /manual-lookup endpoint with GET method
+        api.root.add_resource("manual-lookup").add_method(
+            "GET", manual_user_lookup_integration
+        )
+
         # Create the WebSocket API nested stack
         # websocket_api_stack = WebSocketApiStack(
         #     self, f"{config['project_name']}WebSocketApiStack",
@@ -113,21 +141,3 @@ class AssistedWayfindingBackendStack(Stack):
         #     value=api.url,
         #     description="URL of the API Gateway",
         # )
-
-        directions_integration = apigw.LambdaIntegration(
-            lambda_stack.directions_function
-        )
-        directions_resource = api.root.add_resource("directions")
-        from_resource = directions_resource.add_resource("{from}")
-        to_resource = from_resource.add_resource("{to}")
-        to_resource.add_method("GET", directions_integration)
-
-        # Add manual user lookup integration
-        manual_user_lookup_integration = apigw.LambdaIntegration(
-            lambda_stack.manual_user_lookup_function
-        )
-
-        # Add the /manual-lookup endpoint with GET method
-        api.root.add_resource("manual-lookup").add_method(
-            "GET", manual_user_lookup_integration
-        )

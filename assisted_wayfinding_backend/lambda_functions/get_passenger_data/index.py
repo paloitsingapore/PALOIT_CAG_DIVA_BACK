@@ -24,6 +24,9 @@ def handler(event, context):
     table_name = os.environ.get("DYNAMODB_TABLE_NAME")
     collection_id = os.environ.get("REKOGNITION_COLLECTION_ID")
 
+    logger.info(f"DynamoDB Table Name: {table_name}")
+    logger.info(f"Rekognition Collection ID: {collection_id}")
+
     if not table_name or not collection_id:
         logger.error("Missing required environment variables")
         return {
@@ -36,17 +39,20 @@ def handler(event, context):
     table = dynamodb.Table(table_name)
 
     try:
-        # Extract personaId from the event
-        persona_id = event.get('personaId')
+        # Extract personaId from the event's path parameters
+        persona_id = event.get('pathParameters', {}).get('personaId')
         
+        logger.info(f"Extracted personaId: {persona_id}")
+
         if not persona_id:
-            logger.error("Missing 'personaId' in the event")
+            logger.error("Missing 'personaId' in the event's path parameters")
             return {
                 "statusCode": 400,
-                "body": json.dumps({"error": "Missing 'personaId' in the event"}),
+                "body": json.dumps({"error": "Missing 'personaId' in the event's path parameters"}),
             }
 
         # Query DynamoDB
+        logger.info(f"Querying DynamoDB table '{table_name}' for userId: {persona_id}")
         response = table.get_item(Key={'userId': persona_id})
         logger.info(f"DynamoDB get_item response: {json.dumps(response, default=decimal_default)}")
 
@@ -81,7 +87,10 @@ def handler(event, context):
             }
 
     except ClientError as e:
-        logger.error(f"AWS client error: {str(e)}")
+        error_code = e.response['Error']['Code']
+        error_message = e.response['Error']['Message']
+        logger.error(f"AWS client error: {error_code} - {error_message}")
+        logger.error(f"Full error: {str(e)}")
         return {
             "statusCode": 500,
             "headers": {
@@ -89,7 +98,7 @@ def handler(event, context):
                 "Access-Control-Allow-Headers": "Content-Type",
                 "Access-Control-Allow-Methods": "OPTIONS,POST,GET"
             },
-            "body": json.dumps({"error": str(e)}),
+            "body": json.dumps({"error": f"AWS client error: {error_code} - {error_message}"}),
         }
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}", exc_info=True)
@@ -100,5 +109,5 @@ def handler(event, context):
                 "Access-Control-Allow-Headers": "Content-Type",
                 "Access-Control-Allow-Methods": "OPTIONS,POST,GET"
             },
-            "body": json.dumps({"error": "An unexpected error occurred"}),
+            "body": json.dumps({"error": f"An unexpected error occurred: {str(e)}"}),
         }
