@@ -2,9 +2,8 @@ import base64
 import json
 import logging
 import os
-import random
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox, scrolledtext, ttk
 
 import cv2
 import requests
@@ -22,360 +21,394 @@ API_KEY = os.environ.get("API_KEY")
 API_ENDPOINT = os.environ.get("API_ENDPOINT_URL")
 
 
-class ScrollableFrame(ttk.Frame):
-    def __init__(self, container, *args, **kwargs):
-        super().__init__(container, *args, **kwargs)
-        canvas = tk.Canvas(self)
-        scrollbar = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
-        self.scrollable_frame = ttk.Frame(canvas)
-
-        self.scrollable_frame.bind(
-            "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
-        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-
+# Define the personna list here
 class FaceRecognitionApp:
     def __init__(self, master):
-        logger.info("Initializing FaceRecognitionApp")
         self.master = master
         self.master.title("Face Recognition App")
+        logger.info("Initializing FaceRecognitionApp")
+
         self.is_capturing = False
         self.frame = None
-        self.action = None
         self.cap = None
-
         self.display_width = 640
         self.display_height = 480
 
-        if not os.path.exists("users"):
-            os.makedirs("users")
+        # Define the personna list here
+        self.personna = personna = [
+            [
+                {
+                    "id": "SQ001-2024-08-15",
+                    "flightno": "SQ001",
+                    "scheduled_date": "2024-08-15",
+                    "scheduled_time": "1150",
+                    "terminal": "3",
+                    "display_terminal": "3",
+                    "aircraft_type": "A320",
+                    "origin": "SYD",
+                    "display_time": "1155",
+                    "display_date": "2024-08-15",
+                    "display_belt": "",
+                    "firstbag_time": "1230",
+                    "lastbag_time": "1245",
+                    "display_gate": "D46",
+                    "display_parkingstand": "D46",
+                    "flight_status": "Landed",
+                },
+                {
+                    "Passenger Name": "Albert",
+                    "Date of Birth": "2000-05-01",
+                    "Language": "English",
+                    "Lounge Name": "SilverKris Business Class Lounge",
+                    "passengerId": "passenger_albert",
+                    "changi_app_user_id": "CAU12345SQ",
+                    "next_flight_id": "SQ123",
+                    "has_lounge_access": True,
+                    "accessibilityPreferences": {
+                        "increaseFontSize": False,
+                        "wheelchairAccessibility": False,
+                    },
+                    "airline": "SQ",
+                    "gate": "D46",
+                    "flight_time": "1155",
+                },
+            ],
+            [
+                {
+                    "id": "SQ002-2024-08-15",
+                    "flightno": "SQ002",
+                    "scheduled_date": "2024-08-15",
+                    "scheduled_time": "1150",
+                    "terminal": "3",
+                    "display_terminal": "3",
+                    "aircraft_type": "A350",
+                    "origin": "SYD",
+                    "display_time": "1155",
+                    "display_date": "2024-08-15",
+                    "display_belt": "",
+                    "firstbag_time": "1230",
+                    "lastbag_time": "1245",
+                    "display_gate": "D47",
+                    "display_parkingstand": "D47",
+                    "flight_status": "Landed",
+                },
+                {
+                    "Passenger Name": "Beatrice",
+                    "Date of Birth": "1985-12-15",
+                    "Language": "Mandarin",
+                    "Lounge Name": "KrisFlyer Gold Lounge",
+                    "passengerId": "passenger_beatrice",
+                    "changi_app_user_id": "CAU67890SQ",
+                    "next_flight_id": "SQ456",
+                    "has_lounge_access": True,
+                    "accessibilityPreferences": {
+                        "increaseFontSize": True,
+                        "wheelchairAccessibility": False,
+                    },
+                    "airline": "SQ",
+                    "gate": "D47",
+                    "flight_time": "1155",
+                },
+            ],
+            [
+                {
+                    "id": "SQ003-2024-08-15",
+                    "flightno": "SQ003",
+                    "scheduled_date": "2024-08-15",
+                    "scheduled_time": "1150",
+                    "terminal": "3",
+                    "display_terminal": "3",
+                    "aircraft_type": "A380",
+                    "origin": "SYD",
+                    "display_time": "1155",
+                    "display_date": "2024-08-15",
+                    "display_belt": "",
+                    "firstbag_time": "1230",
+                    "lastbag_time": "1245",
+                    "display_gate": "D48",
+                    "display_parkingstand": "D48",
+                    "flight_status": "Landed",
+                },
+                {
+                    "Passenger Name": "Charlie",
+                    "Date of Birth": "1970-03-22",
+                    "Language": "French",
+                    "Lounge Name": "The Private Room",
+                    "passengerId": "passenger_charlie",
+                    "changi_app_user_id": "CAU24680SQ",
+                    "next_flight_id": "SQ789",
+                    "has_lounge_access": True,
+                    "accessibilityPreferences": {
+                        "increaseFontSize": False,
+                        "wheelchairAccessibility": True,
+                    },
+                    "airline": "SQ",
+                    "gate": "D48",
+                    "flight_time": "1155",
+                },
+            ],
+        ]
 
-        # Create a scrollable frame
-        self.scrollable_frame = ScrollableFrame(self.master)
-        self.scrollable_frame.pack(fill="both", expand=True)
+        # Main frame
+        self.main_frame = ttk.Frame(self.master, padding="10")
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Frame for indexing face
-        self.index_frame = ttk.Frame(self.scrollable_frame.scrollable_frame)
-        self.index_frame.pack(pady=10, padx=10, fill="x")
-
-        tk.Label(self.index_frame, text="Passenger Name:").grid(
-            row=0, column=0, sticky="e"
+        # Persona selection
+        tk.Label(self.main_frame, text="Select Persona:").grid(
+            row=0, column=0, sticky="w", pady=(0, 10)
         )
-        self.passenger_name_entry = tk.Entry(self.index_frame)
-        self.passenger_name_entry.grid(row=0, column=1, columnspan=2, sticky="we")
-
-        tk.Label(self.index_frame, text="Date of Birth:").grid(
-            row=1, column=0, sticky="e"
+        self.persona_var = tk.StringVar()
+        self.persona_dropdown = ttk.Combobox(
+            self.main_frame,
+            textvariable=self.persona_var,
+            values=[f"Persona {i+1}" for i in range(len(self.personna))],
         )
-        self.date_of_birth_entry = tk.Entry(self.index_frame)
-        self.date_of_birth_entry.grid(row=1, column=1, columnspan=2, sticky="we")
+        self.persona_dropdown.grid(row=0, column=1, sticky="we", pady=(0, 10))
+        self.persona_dropdown.bind("<<ComboboxSelected>>", self.update_data_displays)
 
-        self.has_lounge_access = tk.BooleanVar()
-        self.increase_font_size = tk.BooleanVar()
-        self.wheelchair_accessibility = tk.BooleanVar()
+        # Frame for displaying persona data
+        self.persona_frame = ttk.Frame(self.main_frame)
+        self.persona_frame.grid(row=1, column=0, columnspan=2, sticky="nsew")
 
-        ttk.Checkbutton(
-            self.index_frame, text="Lounge Access", variable=self.has_lounge_access
-        ).grid(row=2, column=0, columnspan=3, sticky="w")
-        ttk.Checkbutton(
-            self.index_frame,
-            text="Increase Font Size",
-            variable=self.increase_font_size,
-        ).grid(row=3, column=0, columnspan=3, sticky="w")
-        ttk.Checkbutton(
-            self.index_frame,
-            text="Wheelchair Accessibility",
-            variable=self.wheelchair_accessibility,
-        ).grid(row=4, column=0, columnspan=3, sticky="w")
-
-        # Add language field
-        tk.Label(self.index_frame, text="Language:").grid(row=5, column=0, sticky="e")
-        self.language_entry = tk.Entry(self.index_frame)
-        self.language_entry.grid(row=5, column=1, columnspan=2, sticky="we")
-
-        # Add new fields after the language entry
-        tk.Label(self.index_frame, text="Airline:").grid(row=6, column=0, sticky="e")
-        self.airline_entry = tk.Entry(self.index_frame)
-        self.airline_entry.grid(row=6, column=1, columnspan=2, sticky="we")
-
-        tk.Label(self.index_frame, text="Lounge Name:").grid(
-            row=7, column=0, sticky="e"
+        # Flight data display
+        tk.Label(self.persona_frame, text="Flight Data:").grid(
+            row=0, column=0, sticky="w"
         )
-        self.lounge_name_entry = tk.Entry(self.index_frame)
-        self.lounge_name_entry.grid(row=7, column=1, columnspan=2, sticky="we")
-
-        tk.Label(self.index_frame, text="Gate:").grid(row=8, column=0, sticky="e")
-        self.gate_entry = tk.Entry(self.index_frame)
-        self.gate_entry.grid(row=8, column=1, columnspan=2, sticky="we")
-
-        tk.Label(self.index_frame, text="Flight Time:").grid(
-            row=9, column=0, sticky="e"
+        self.flight_data_display = scrolledtext.ScrolledText(
+            self.persona_frame, height=10, width=80
         )
-        self.flight_time_entry = tk.Entry(self.index_frame)
-        self.flight_time_entry.grid(row=9, column=1, columnspan=2, sticky="we")
+        self.flight_data_display.grid(row=1, column=0, pady=(0, 10))
 
-        # Frame for recognizing face
-        self.recognize_frame = ttk.Frame(self.scrollable_frame.scrollable_frame)
-        self.recognize_frame.pack(pady=10, padx=10, fill="x")
+        # Passenger data display
+        tk.Label(self.persona_frame, text="Passenger Data:").grid(
+            row=2, column=0, sticky="w"
+        )
+        self.passenger_data_display = scrolledtext.ScrolledText(
+            self.persona_frame, height=10, width=80
+        )
+        self.passenger_data_display.grid(row=3, column=0)
 
-        # 1) Init, Capture button
-        tk.Button(
-            self.recognize_frame,
-            text="1) Init, Capture",
-            command=lambda: self.start_capture("recognize"),
-        ).grid(row=0, columnspan=2)
+        # Camera control buttons
+        self.camera_frame = ttk.Frame(self.main_frame)
+        self.camera_frame.grid(
+            row=2, column=0, columnspan=2, sticky="nsew", pady=(10, 0)
+        )
 
-        # 2) Snapshot in 3 angles button
-        self.snapshot_button = tk.Button(
-            self.recognize_frame,
-            text="2) Snapshot in 3 angles",
+        self.start_camera_button = ttk.Button(
+            self.camera_frame, text="1) Init", command=self.start_capture
+        )
+        self.start_camera_button.grid(row=0, column=0, padx=5)
+
+        self.capture_button = ttk.Button(
+            self.camera_frame,
+            text="2) Capture 2-3 Images",
             command=self.capture_face,
             state=tk.DISABLED,
         )
-        self.snapshot_button.grid(row=1, columnspan=2)
+        self.capture_button.grid(row=0, column=1, padx=5)
 
-        # 3) Save button (previously "Index User")
-        self.save_button = tk.Button(
-            self.recognize_frame,
+        self.index_button = ttk.Button(
+            self.camera_frame,
             text="3) Save",
-            command=self.index_user,
+            command=self.index_face,
             state=tk.DISABLED,
         )
-        self.save_button.grid(row=2, columnspan=2)
+        self.index_button.grid(row=0, column=2, padx=5)
 
-        # Stop capture button
-        self.stop_button = ttk.Button(
-            self.scrollable_frame.scrollable_frame,
-            text="Stop Capture",
-            command=self.stop_capture,
+        self.recognize_button = ttk.Button(
+            self.camera_frame,
+            text="Recognize Face",
+            command=self.recognize_face,
             state=tk.DISABLED,
         )
-        self.stop_button.pack(pady=10)
+        self.recognize_button.grid(row=0, column=3, padx=5)
 
         # Canvas for displaying the camera feed
         self.canvas = tk.Canvas(
-            self.scrollable_frame.scrollable_frame,
-            width=self.display_width,
-            height=self.display_height,
+            self.main_frame, width=self.display_width, height=self.display_height
         )
-        self.canvas.pack(pady=10)
+        self.canvas.grid(row=3, column=0, columnspan=2, pady=10)
 
+        # Configure grid weights
+        self.main_frame.columnconfigure(1, weight=1)
+        self.main_frame.rowconfigure(3, weight=1)
+
+        # Initialize captured faces
         self.captured_faces = []
 
-        # Add a new button for removing all faces
-        self.remove_all_button = ttk.Button(
-            self.scrollable_frame.scrollable_frame,
-            text="Remove All Faces",
-            command=self.remove_all_faces,
-            style="Red.TButton",
-        )
-        self.remove_all_button.pack(pady=10)
+    def update_data_displays(self, event):
+        selected_value = self.persona_var.get()
+        if not selected_value:
+            return  # Exit the method if no value is selected
 
-        # Create a custom style for the red button
-        style = ttk.Style()
-        style.configure("Red.TButton", foreground="white", background="red")
+        try:
+            selected_persona = int(selected_value.split()[-1]) - 1
+        except (ValueError, IndexError):
+            messagebox.showerror("Error", "Invalid persona selection")
+            return
 
-    def start_capture(self, action):
-        logger.info(f"Starting capture for action: {action}")
-        self.action = action
+        if 0 <= selected_persona < len(self.personna):
+            flight_data = self.personna[selected_persona][0]
+            passenger_data = self.personna[selected_persona][1]
+
+            # Display the flight data
+            self.flight_data_display.delete("1.0", tk.END)
+            self.flight_data_display.insert(tk.END, json.dumps(flight_data, indent=2))
+
+            # Display the passenger data
+            self.passenger_data_display.delete("1.0", tk.END)
+            self.passenger_data_display.insert(
+                tk.END, json.dumps(passenger_data, indent=2)
+            )
+        else:
+            messagebox.showerror("Error", "Invalid persona selection")
+
+    def start_capture(self):
+        logger.info("Starting capture")
         self.is_capturing = True
-        self.stop_button.config(state=tk.NORMAL)
-        self.snapshot_button.config(state=tk.NORMAL)  # Enable the snapshot button
-        self.capture_image()
-
-    def stop_capture(self):
-        logger.info("Stopping capture")
-        self.is_capturing = False
-        self.stop_button.config(state=tk.DISABLED)
-        if self.cap:
-            self.cap.release()
-        if self.action == "index":
-            self.index_face()
-        elif self.action == "recognize":
-            self.recognize_face()
-
-    def capture_image(self):
-        logger.info("Capturing image")
         self.cap = cv2.VideoCapture(0)
-
-        # Set the capture resolution (you may need to adjust these values)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
         self.update_frame()
+        self.start_camera_button.config(state=tk.DISABLED)
+        self.capture_button.config(state=tk.NORMAL)
+        self.recognize_button.config(state=tk.NORMAL)  # Enable recognize button
 
     def update_frame(self):
         if self.is_capturing:
             ret, frame = self.cap.read()
             if ret:
                 frame = cv2.flip(frame, 1)
-
-                # Resize the frame to fit the display size
                 frame = cv2.resize(frame, (self.display_width, self.display_height))
-
                 self.frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 self.photo = ImageTk.PhotoImage(image=Image.fromarray(self.frame))
                 self.canvas.create_image(0, 0, image=self.photo, anchor=tk.NW)
-                logger.debug("Frame updated")
-            else:
-                logger.warning("Failed to capture frame")
             self.master.after(10, self.update_frame)
-        else:
-            if self.cap:
-                self.cap.release()
-                logger.info("Camera released")
 
     def capture_face(self):
-        logger.info("Capturing face")
+        logger.info("Attempting to capture face")
         if self.frame is None:
-            logger.error("No image captured")
-            messagebox.showerror("Error", "No image captured.")
+            logger.error("No frame available for capture")
+            messagebox.showerror("Error", "No frame available for capture.")
             return
 
-        self.captured_faces.append(self.frame)
-        logger.info(f"Face captured. Total faces: {len(self.captured_faces)}")
+        if self.frame.size == 0:
+            logger.error("Frame is empty")
+            messagebox.showerror("Error", "Captured frame is empty.")
+            return
+
+        # Create a copy of the frame to avoid modifying the original
+        captured_frame = self.frame.copy()
+
+        # Convert the frame from RGB to BGR (OpenCV format)
+        captured_frame_bgr = cv2.cvtColor(captured_frame, cv2.COLOR_RGB2BGR)
+
+        # Append the BGR frame to the captured_faces list
+        self.captured_faces.append(captured_frame_bgr)
+
+        logger.info(
+            f"Face captured successfully. Total faces: {len(self.captured_faces)}"
+        )
+        logger.debug(f"Captured frame shape: {captured_frame_bgr.shape}")
         messagebox.showinfo(
             "Success", f"Face captured. Total faces: {len(self.captured_faces)}"
         )
 
         if len(self.captured_faces) > 0:
-            self.save_button.config(state=tk.NORMAL)
-            logger.debug("Save button enabled")
-
-    def index_user(self):
-        logger.info("Indexing user")
-        passenger_name = self.passenger_name_entry.get()
-        date_of_birth = self.date_of_birth_entry.get()
-        if not passenger_name:
-            logger.error("Passenger name is empty")
-            messagebox.showerror("Error", "Passenger name cannot be empty.")
-            return
-        if not date_of_birth:
-            logger.error("Date of birth is empty")
-            messagebox.showerror("Error", "Date of birth cannot be empty.")
-            return
-
-        if not self.captured_faces:
-            logger.error("No faces captured")
-            messagebox.showerror("Error", "No faces captured.")
-            return
-
-        user_id = f"user_{passenger_name.replace(' ', '_').lower()}"
-        logger.info(f"User ID: {user_id}")
-
-        # Update the payload with new fields
-        payload = {
-            "userId": user_id,
-            "images": [],
-            "passengerData": {
-                "name": passenger_name,
-                "dateOfBirth": date_of_birth,
-                "passengerId": f"passenger_{passenger_name.replace(' ', '_').lower()}",
-                "changi_app_user_id": f"CAU{random.randint(10000, 99999)}SQ",
-                "next_flight_id": f"SQ{random.randint(100, 999)}",
-                "has_lounge_access": self.has_lounge_access.get(),
-                "accessibilityPreferences": {
-                    "increaseFontSize": self.increase_font_size.get(),
-                    "wheelchairAccessibility": self.wheelchair_accessibility.get(),
-                },
-                "language": self.language_entry.get(),
-                "airline": self.airline_entry.get(),
-                "lounge_name": self.lounge_name_entry.get()
-                if self.has_lounge_access.get()
-                else None,
-                "gate": self.gate_entry.get(),
-                "flight_time": self.flight_time_entry.get(),
-            },
-        }
-
-        for i, face in enumerate(self.captured_faces):
-            filename = f"{user_id}_face_{i}.jpg"
-            image_path = os.path.join("users", filename)
-            cv2.imwrite(image_path, cv2.cvtColor(face, cv2.COLOR_RGB2BGR))
-            logger.info(f"Saved face image: {image_path}")
-
-            with open(image_path, "rb") as image_file:
-                encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
-                payload["images"].append(encoded_image)
-
-        # Send payload to backend
-        logger.info(f"Sending indexing request to {API_ENDPOINT}/index")
-        response = requests.post(f"{API_ENDPOINT}/index", json=payload)
-
-        if response.status_code == 200:
-            result = response.json()
-            logger.info(f"User indexed successfully. User ID: {result['userId']}")
-            messagebox.showinfo(
-                "Success", f"User indexed successfully. User ID: {result['userId']}"
-            )
-        else:
-            logger.error(f"Failed to index user: {response.text}")
-            messagebox.showerror("Error", f"Failed to index user: {response.text}")
-
-        # Clear captured faces
-        self.captured_faces = []
-        self.index_button.config(state=tk.DISABLED)
-        logger.info("Captured faces cleared and index button disabled")
+            self.index_button.config(state=tk.NORMAL)
+            logger.debug("Index button enabled")
 
     def index_face(self):
         logger.info("Indexing face")
-        passenger_name = self.passenger_name_entry.get()
-        if not passenger_name:
-            messagebox.showerror("Error", "Passenger name cannot be empty.")
+        if not self.captured_faces:
+            messagebox.showerror("Error", "No faces captured.")
             return
 
-        if self.frame is None:
-            messagebox.showerror("Error", "No image captured.")
+        selected_value = self.persona_var.get()
+        if not selected_value:
+            messagebox.showerror("Error", "No persona selected.")
             return
 
-        # Create a valid filename from the passenger name
-        filename = f"{passenger_name.replace(' ', '_').lower()}.jpg"
-        image_path = os.path.join("users", filename)
+        try:
+            selected_persona = int(selected_value.split()[-1]) - 1
+        except (ValueError, IndexError):
+            messagebox.showerror("Error", "Invalid persona selection")
+            return
 
-        # Save the captured image
-        cv2.imwrite(image_path, cv2.cvtColor(self.frame, cv2.COLOR_RGB2BGR))
+        if 0 <= selected_persona < len(self.personna):
+            flight_data = self.personna[selected_persona][0]
+            passenger_data = self.personna[selected_persona][1]
+        else:
+            messagebox.showerror("Error", "Invalid persona selection")
+            return
 
-        # Encode image
-        with open(image_path, "rb") as image_file:
-            encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+        # Convert all captured faces to base64
+        images_base64 = []
+        for face in self.captured_faces:
+            # face is already in BGR format, so we don't need to convert it
+            _, buffer = cv2.imencode(".jpg", face)
+            images_base64.append(base64.b64encode(buffer).decode("utf-8"))
 
         # Prepare payload
         payload = {
-            "image": encoded_image,
+            "userId": passenger_data["passengerId"],
+            "images": images_base64,
             "passengerData": {
-                "name": passenger_name,
-                "passengerId": f"passenger_{passenger_name.replace(' ', '_').lower()}",
-                "changi_app_user_id": f"CAU{random.randint(10000, 99999)}SQ",
-                "next_flight_id": f"SQ{random.randint(100, 999)}",
-                "has_lounge_access": self.has_lounge_access.get(),
-                "accessibilityPreferences": {
-                    "increaseFontSize": self.increase_font_size.get(),
-                    "wheelchairAccessibility": self.wheelchair_accessibility.get(),
-                },
-                "language": self.language_entry.get(),
+                "name": passenger_data["Passenger Name"],
+                "dateOfBirth": passenger_data["Date of Birth"],
+                "changi_app_user_id": passenger_data["changi_app_user_id"],
+                "next_flight_id": passenger_data["next_flight_id"],
+                "has_lounge_access": passenger_data["has_lounge_access"],
+                "accessibilityPreferences": passenger_data["accessibilityPreferences"],
+                "language": passenger_data["Language"],
+                "airline": passenger_data["airline"],
+                "lounge_name": passenger_data["Lounge Name"],
+                "gate": passenger_data["gate"],
+                "flight_time": passenger_data["flight_time"],
+                "flightno": flight_data["flightno"],
+                "scheduled_date": flight_data["scheduled_date"],
+                "terminal": flight_data["terminal"],
+                "aircraft_type": flight_data["aircraft_type"],
+                "origin": flight_data["origin"],
+                "display_date": flight_data["display_date"],
+                "firstbag_time": flight_data["firstbag_time"],
+                "lastbag_time": flight_data["lastbag_time"],
+                "flight_status": flight_data["flight_status"],
             },
         }
 
-        headers = {"x-api-key": API_KEY, "Content-Type": "application/json"}
-        response = requests.post(API_ENDPOINT + "index", json=payload, headers=headers)
+        # Log the payload (excluding the image data for brevity)
+        payload_log = payload.copy()
+        payload_log["images"] = [
+            f"<base64_encoded_image_{i}>" for i in range(len(images_base64))
+        ]
+        logger.info(f"Payload being sent: {json.dumps(payload_log, indent=2)}")
 
-        if response.status_code == 200:
-            result = response.json()
-            face_id = result.get("faceId")
-            if face_id:
+        headers = {"x-api-key": API_KEY, "Content-Type": "application/json"}
+
+        try:
+            response = requests.post(
+                f"{API_ENDPOINT}/index", json=payload, headers=headers
+            )
+            if response.status_code == 200:
+                result = response.json()
+                logger.info("Faces indexed successfully:")
+                logger.info(json.dumps(result, indent=2))
                 messagebox.showinfo(
-                    "Success", f"Face indexed successfully. Face ID: {face_id}"
+                    "Indexing Result",
+                    f"{len(self.captured_faces)} faces indexed successfully.",
                 )
+                # Clear captured faces after successful indexing
+                self.captured_faces = []
+                self.index_button.config(state=tk.DISABLED)
             else:
-                messagebox.showerror("Error", "Face ID not found in the response.")
-        else:
-            messagebox.showerror("Error", f"Failed to index face: {response.text}")
+                logger.error(f"Error: {response.status_code} - {response.text}")
+                messagebox.showerror(
+                    "Error", f"Error: {response.status_code} - {response.text}"
+                )
+        except requests.RequestException as e:
+            logger.error(f"Error connecting to the server: {str(e)}")
+            messagebox.showerror("Error", f"Error connecting to the server: {str(e)}")
 
     def recognize_face(self):
         logger.info("Recognizing face")
@@ -386,7 +419,13 @@ class FaceRecognitionApp:
 
         # Use a generic name for recognition images
         image_path = os.path.join("users", "recognition_image.jpg")
-        cv2.imwrite(image_path, cv2.cvtColor(self.frame, cv2.COLOR_RGB2BGR))
+
+        # Save the image in high quality
+        cv2.imwrite(
+            image_path,
+            cv2.cvtColor(self.frame, cv2.COLOR_RGB2BGR),
+            [cv2.IMWRITE_JPEG_QUALITY, 100],
+        )
         logger.info(f"Saved recognition image: {image_path}")
 
         with open(image_path, "rb") as image_file:
@@ -426,7 +465,10 @@ class FaceRecognitionApp:
             "Are you sure you want to remove all registered faces? This action cannot be undone.",
         ):
             try:
-                response = requests.post(f"{API_ENDPOINT}/remove_all_faces")
+                headers = {"x-api-key": API_KEY, "Content-Type": "application/json"}
+                response = requests.post(
+                    f"{API_ENDPOINT}/remove_all_faces", headers=headers
+                )
                 if response.status_code == 200:
                     logger.info("All faces removed successfully")
                     messagebox.showinfo(
@@ -444,10 +486,13 @@ class FaceRecognitionApp:
                 )
 
 
-if __name__ == "__main__":
-    logger.info("Starting FaceRecognitionApp")
+def main():
     root = tk.Tk()
-    root.geometry("700x800")  # Set an initial size for the window
     app = FaceRecognitionApp(root)
     root.mainloop()
+
+
+if __name__ == "__main__":
+    logger.info("Starting FaceRecognitionApp")
+    main()
     logger.info("FaceRecognitionApp closed")
