@@ -1,12 +1,14 @@
 from aws_cdk import (
     Stack,
     aws_apigateway as apigw,
+    CfnOutput,
 )
 from constructs import Construct
 
 from .nested_stacks.dynamodb_stack import DynamoDBStack
 from .nested_stacks.lambda_stack import LambdaStack
 from .nested_stacks.storage_stack import StorageStack
+from .nested_stacks.websocket_api_stack import WebSocketApiStack
 
 
 class AssistedWayfindingBackendStack(Stack):
@@ -57,12 +59,17 @@ class AssistedWayfindingBackendStack(Stack):
             "DYNAMODB_TABLE_NAME", dynamodb_stack.table_name
         )
 
-        # Create API Gateway
+        # Create API Gateway with CORS
         api = apigw.RestApi(
             self,
             f"{config['project_name']}Api",
             rest_api_name=f"{config['project_name']} API",
             description="API for Assisted Wayfinding",
+            default_cors_preflight_options=apigw.CorsOptions(
+                allow_origins=["http://localhost:3000"],
+                allow_methods=["GET", "POST", "OPTIONS"],
+                allow_headers=["Content-Type", "Authorization"],
+            ),
         )
 
         face_recognition_integration = apigw.LambdaIntegration(
@@ -85,6 +92,16 @@ class AssistedWayfindingBackendStack(Stack):
             "POST", remove_all_faces_integration
         )
 
+        # Add get passenger data integration
+        get_passenger_data_integration = apigw.LambdaIntegration(
+            lambda_stack.get_passenger_data_function
+        )
+
+        # Add the /passenger/{personaId} endpoint with GET method
+        passenger_resource = api.root.add_resource("passenger")
+        persona_id_resource = passenger_resource.add_resource("{personaId}")
+        persona_id_resource.add_method("GET", get_passenger_data_integration)
+
         directions_integration = apigw.LambdaIntegration(
             lambda_stack.directions_function
         )
@@ -102,3 +119,25 @@ class AssistedWayfindingBackendStack(Stack):
         api.root.add_resource("manual-lookup").add_method(
             "GET", manual_user_lookup_integration
         )
+
+        # Create the WebSocket API nested stack
+        # websocket_api_stack = WebSocketApiStack(
+        #     self, f"{config['project_name']}WebSocketApiStack",
+        #     orchestration_function=lambda_stack.orchestration_function
+        # )
+
+        # # Update config with WebSocket API endpoint
+        # config['websocket_api_endpoint'] = websocket_api_stack.websocket_stage.url
+
+        # # Update Lambda environment with WebSocket API endpoint
+        # lambda_stack.orchestration_function.add_environment(
+        #     "WEBSOCKET_API_ENDPOINT", config['websocket_api_endpoint']
+        # )
+
+        # # Add CfnOutput for API URL
+        # CfnOutput(
+        #     self,
+        #     "ApiUrl",
+        #     value=api.url,
+        #     description="URL of the API Gateway",
+        # )

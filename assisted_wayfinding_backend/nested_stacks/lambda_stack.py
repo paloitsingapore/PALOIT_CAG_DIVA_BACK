@@ -86,7 +86,7 @@ class LambdaStack(NestedStack):
             actions=[
                 "s3:PutObject",
                 "s3:GetObject",
-                "s3:DeleteObject",  # Add this line
+                "s3:DeleteObject",
             ],
             resources=[
                 f"arn:aws:s3:::{config['s3_bucket_name']}/*",
@@ -159,7 +159,7 @@ class LambdaStack(NestedStack):
                 actions=[
                     "dynamodb:Scan",
                     "dynamodb:DeleteItem",
-                    "dynamodb:BatchWriteItem",  # Add this line
+                    "dynamodb:BatchWriteItem",
                 ],
                 resources=[
                     f"arn:aws:dynamodb:{self.region}:{self.account}:table/{config['dynamodb_table_name']}"
@@ -167,6 +167,61 @@ class LambdaStack(NestedStack):
             )
         )
 
+        # Create a Lambda function for orchestration
+        self.orchestration_function = _lambda.Function(
+            self, "OrchestrationFunction",
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            handler="index.handler",
+            code=_lambda.Code.from_asset("assisted_wayfinding_backend/lambda_functions/orchestration"),
+            memory_size=config['lambda_memory_size'],
+            timeout=Duration.seconds(config['lambda_timeout']),
+            environment={
+                "WEBSOCKET_API_ENDPOINT": config['websocket_api_endpoint'],
+            }
+        )
+
+        # Grant permissions to use API Gateway Management API
+        self.orchestration_function.add_to_role_policy(iam.PolicyStatement(
+            actions=["execute-api:ManageConnections"],
+            resources=[f"arn:aws:execute-api:{self.region}:{self.account}:*/*/*/*"]
+        ))
+
+        # Add the new get_passenger_data Lambda function
+        self.get_passenger_data_function = _lambda.Function(
+            self,
+            "GetPassengerDataFunction",
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            handler="index.handler",
+            code=_lambda.Code.from_asset(
+                "assisted_wayfinding_backend/lambda_functions/get_passenger_data"
+            ),
+            memory_size=config["lambda_memory_size"],
+            timeout=Duration.seconds(config["lambda_timeout"]),
+            environment={
+                "DYNAMODB_TABLE_NAME": config["dynamodb_table"].table_name,  # Use this instead
+                "REKOGNITION_COLLECTION_ID": config["rekognition_collection_id"],
+                "PROJECT_NAME": config["project_name"],
+                "ENVIRONMENT": config["environment"],
+            },
+        )
+
+        # Update DynamoDB permissions for the get_passenger_data function
+        dynamodb_policy = iam.PolicyStatement(
+            actions=[
+                "dynamodb:GetItem",
+                "dynamodb:Query",
+            ],
+            resources=[config["dynamodb_table"].table_arn],
+        )
+        self.get_passenger_data_function.add_to_role_policy(dynamodb_policy)
+
+        # Update the orchestration function to allow invoking the get_passenger_data function
+        self.orchestration_function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["lambda:InvokeFunction"],
+                resources=[self.get_passenger_data_function.function_arn]
+            )
+        )
         # Add the Directions Lambda function
         self.directions_function = _lambda.Function(
             self,
