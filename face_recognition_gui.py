@@ -10,7 +10,6 @@ import cv2
 import requests
 from dotenv import load_dotenv
 from PIL import Image, ImageTk
-from datetime import datetime
 
 # Set up logging
 logging.basicConfig(
@@ -22,6 +21,7 @@ load_dotenv()
 API_KEY = os.environ.get("API_KEY")
 API_ENDPOINT = os.environ.get("API_ENDPOINT_URL")
 
+
 class ScrollableFrame(ttk.Frame):
     def __init__(self, container, *args, **kwargs):
         super().__init__(container, *args, **kwargs)
@@ -30,8 +30,7 @@ class ScrollableFrame(ttk.Frame):
         self.scrollable_frame = ttk.Frame(canvas)
 
         self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+            "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
 
         canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
@@ -39,6 +38,7 @@ class ScrollableFrame(ttk.Frame):
 
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+
 
 class FaceRecognitionApp:
     def __init__(self, master):
@@ -71,7 +71,9 @@ class FaceRecognitionApp:
         self.passenger_name_entry.grid(row=0, column=1, columnspan=2, sticky="we")
 
         # Add this after the passenger name entry
-        tk.Label(self.index_frame, text="Date of Birth:").grid(row=1, column=0, sticky="e")
+        tk.Label(self.index_frame, text="Date of Birth:").grid(
+            row=1, column=0, sticky="e"
+        )
         self.date_of_birth_entry = tk.Entry(self.index_frame)
         self.date_of_birth_entry.grid(row=1, column=1, columnspan=2, sticky="we")
 
@@ -103,7 +105,9 @@ class FaceRecognitionApp:
         self.airline_entry = tk.Entry(self.index_frame)
         self.airline_entry.grid(row=6, column=1, columnspan=2, sticky="we")
 
-        tk.Label(self.index_frame, text="Lounge Name:").grid(row=7, column=0, sticky="e")
+        tk.Label(self.index_frame, text="Lounge Name:").grid(
+            row=7, column=0, sticky="e"
+        )
         self.lounge_name_entry = tk.Entry(self.index_frame)
         self.lounge_name_entry.grid(row=7, column=1, columnspan=2, sticky="we")
 
@@ -111,7 +115,9 @@ class FaceRecognitionApp:
         self.gate_entry = tk.Entry(self.index_frame)
         self.gate_entry.grid(row=8, column=1, columnspan=2, sticky="we")
 
-        tk.Label(self.index_frame, text="Flight Time:").grid(row=9, column=0, sticky="e")
+        tk.Label(self.index_frame, text="Flight Time:").grid(
+            row=9, column=0, sticky="e"
+        )
         self.flight_time_entry = tk.Entry(self.index_frame)
         self.flight_time_entry.grid(row=9, column=1, columnspan=2, sticky="we")
 
@@ -132,11 +138,30 @@ class FaceRecognitionApp:
         self.recognize_frame = ttk.Frame(self.scrollable_frame.scrollable_frame)
         self.recognize_frame.pack(pady=10, padx=10, fill="x")
 
+        # 1) Init, Capture button
         tk.Button(
             self.recognize_frame,
-            text="Capture & Recognize Face",
+            text="1) Init, Capture",
             command=lambda: self.start_capture("recognize"),
         ).grid(row=0, columnspan=2)
+
+        # 2) Snapshot in 3 angles button
+        self.snapshot_button = tk.Button(
+            self.recognize_frame,
+            text="2) Snapshot in 3 angles",
+            command=self.capture_face,
+            state=tk.DISABLED,
+        )
+        self.snapshot_button.grid(row=1, columnspan=2)
+
+        # 3) Save button (previously "Index User")
+        self.save_button = tk.Button(
+            self.recognize_frame,
+            text="3) Save",
+            command=self.index_user,
+            state=tk.DISABLED,
+        )
+        self.save_button.grid(row=2, columnspan=2)
 
         # Stop capture button
         self.stop_button = ttk.Button(
@@ -149,7 +174,9 @@ class FaceRecognitionApp:
 
         # Canvas for displaying the camera feed
         self.canvas = tk.Canvas(
-            self.scrollable_frame.scrollable_frame, width=self.display_width, height=self.display_height
+            self.scrollable_frame.scrollable_frame,
+            width=self.display_width,
+            height=self.display_height,
         )
         self.canvas.pack(pady=10)
 
@@ -160,7 +187,7 @@ class FaceRecognitionApp:
             self.scrollable_frame.scrollable_frame,
             text="Remove All Faces",
             command=self.remove_all_faces,
-            style="Red.TButton"
+            style="Red.TButton",
         )
         self.remove_all_button.pack(pady=10)
 
@@ -173,6 +200,7 @@ class FaceRecognitionApp:
         self.action = action
         self.is_capturing = True
         self.stop_button.config(state=tk.NORMAL)
+        self.snapshot_button.config(state=tk.NORMAL)  # Enable the snapshot button
         self.capture_image()
 
     def stop_capture(self):
@@ -231,8 +259,8 @@ class FaceRecognitionApp:
         )
 
         if len(self.captured_faces) > 0:
-            self.index_button.config(state=tk.NORMAL)
-            logger.debug("Index button enabled")
+            self.save_button.config(state=tk.NORMAL)
+            logger.debug("Save button enabled")
 
     def index_user(self):
         logger.info("Indexing user")
@@ -272,7 +300,9 @@ class FaceRecognitionApp:
                 },
                 "language": self.language_entry.get(),
                 "airline": self.airline_entry.get(),
-                "lounge_name": self.lounge_name_entry.get() if self.has_lounge_access.get() else None,
+                "lounge_name": self.lounge_name_entry.get()
+                if self.has_lounge_access.get()
+                else None,
                 "gate": self.gate_entry.get(),
                 "flight_time": self.flight_time_entry.get(),
             },
