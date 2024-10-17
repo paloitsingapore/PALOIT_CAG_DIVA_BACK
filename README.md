@@ -12,6 +12,16 @@ directory.  To create the virtualenv it assumes that there is a `python3`
 package. If for any reason the automatic creation of the virtualenv fails,
 you can create the virtualenv manually.
 
+# Requirements
+## python 3.12
+on mac os: brew install python@3.12
+on linux: sudo apt-get install python3.12
+
+## python-tk 
+on mac os: brew install python-tk
+on linux: sudo apt-get install python-tk
+
+
 To manually create a virtualenv on MacOS and Linux:
 
 ```
@@ -42,6 +52,38 @@ At this point you can now synthesize the CloudFormation template for this code.
 ```
 $ cdk synth
 ```
+
+
+If you want to deploy you need to configure your AWS credentials. You can do this by running the following command:
+
+```
+API_KEY=XXXXXXXXX 
+```
+example : ASIDSQADSFHDS3SDSN2C
+
+```
+API_ENDPOINT=xxxxx
+```    
+example : API_ENDPOINT_URL=https://xxxxx.execute-api.ap-southeast-1.amazonaws.com/prod
+
+```
+
+
+You can deploy your code to AWS by running the following command:
+
+```
+$ cdk deploy
+```
+
+
+You can add additional faces to the collection by running the following command:
+
+```
+$ python face_recognition_gui.py
+```
+
+Once you have added your faces, you can run the front end and explore 
+
 
 To add additional dependencies, for example other CDK libraries, just add
 them to your `setup.py` file and rerun the `pip install -r requirements.txt`
