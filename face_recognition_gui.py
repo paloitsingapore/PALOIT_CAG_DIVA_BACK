@@ -70,7 +70,6 @@ class FaceRecognitionApp:
         self.passenger_name_entry = tk.Entry(self.index_frame)
         self.passenger_name_entry.grid(row=0, column=1, columnspan=2, sticky="we")
 
-        # Add this after the passenger name entry
         tk.Label(self.index_frame, text="Date of Birth:").grid(
             row=1, column=0, sticky="e"
         )
@@ -120,19 +119,6 @@ class FaceRecognitionApp:
         )
         self.flight_time_entry = tk.Entry(self.index_frame)
         self.flight_time_entry.grid(row=9, column=1, columnspan=2, sticky="we")
-
-        self.capture_button = tk.Button(
-            self.index_frame, text="Capture Face", command=self.capture_face
-        )
-        self.capture_button.grid(row=10, column=0)
-
-        self.index_button = tk.Button(
-            self.index_frame,
-            text="Index User",
-            command=self.index_user,
-            state=tk.DISABLED,
-        )
-        self.index_button.grid(row=10, column=1)
 
         # Frame for recognizing face
         self.recognize_frame = ttk.Frame(self.scrollable_frame.scrollable_frame)
