@@ -1,9 +1,11 @@
 
-# Welcome to your CDK Python project!
+# Welcome to your Python project!
 
-This is a blank project for CDK development with Python.
-
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+## You will find the CDK and the backend tools
+- Directions
+- Backend Stack
+- Face Indexing and Recognition
+- Orchestration Layer
 
 This project is set up like a standard Python project.  The initialization
 process also creates a virtualenv within this project, stored under the `.venv`
@@ -13,17 +15,24 @@ package. If for any reason the automatic creation of the virtualenv fails,
 you can create the virtualenv manually.
 
 # Requirements
-## python 3.12
+### python 3.12
 on mac os: brew install python@3.12
 on linux: sudo apt-get install python3.12
 
-## python-tk 
+### python-tk 
 on mac os: brew install python-tk
 on linux: sudo apt-get install python-tk
 
 
-To manually create a virtualenv on MacOS and Linux:
+Create .env file at the root of the project
+```
+CDK_DEFAULT_ACCOUNT=034362042832
+CDK_DEFAULT_REGION=ap-southeast-1
+API_ENDPOINT_URL= https://ed5zq5eya8.execute-api.ap-southeast-1.amazonaws.com/prod/
+API_KEY=sO7UjJjqBg61I8uWVS6cu1ijLtwEx4Wg2x7xQUdK
+```
 
+To manually create a virtualenv on MacOS and Linux:
 ```
 $ python3 -m venv .venv
 ```
@@ -47,42 +56,21 @@ Once the virtualenv is activated, you can install the required dependencies.
 $ pip install -r requirements.txt
 ```
 
-At this point you can now synthesize the CloudFormation template for this code.
+
+## CDK 
+
+The `cdk.json` file tells the CDK Toolkit how to execute your app.
+
+You can now synthesize the CloudFormation template for this code.
 
 ```
 $ cdk synth
 ```
-
-
-If you want to deploy you need to configure your AWS credentials. You can do this by running the following command:
-
-```
-API_KEY=XXXXXXXXX 
-```
-example : ASIDSQADSFHDS3SDSN2C
-
-```
-API_ENDPOINT=xxxxx
-```    
-example : API_ENDPOINT_URL=https://xxxxx.execute-api.ap-southeast-1.amazonaws.com/prod
-
-```
-
-
 You can deploy your code to AWS by running the following command:
 
 ```
 $ cdk deploy
 ```
-
-
-You can add additional faces to the collection by running the following command:
-
-```
-$ python face_recognition_gui.py
-```
-
-Once you have added your faces, you can run the front end and explore 
 
 
 To add additional dependencies, for example other CDK libraries, just add
@@ -97,4 +85,25 @@ command.
  * `cdk diff`        compare deployed stack with current state
  * `cdk docs`        open CDK documentation
 
+
+
+## Face Indexing and Recognition
+
+To start, you will need to index faces using the face recognition indexing built in Python.
+
+You can add additional faces to the collection by running the following command:
+```
+$ python face_recognition_gui.py
+```
+
+Put the Name of the passenger and select the persona.
+
+For the POC, we created 3 personas. Find details in the presentation deck.
+
+To help you indexing the faces we created 2 videos in the folder 
+- to index the face
+- to recognise a face.
+
+
+Once you have added your faces, you can run the front end and explore 
 Enjoy!
