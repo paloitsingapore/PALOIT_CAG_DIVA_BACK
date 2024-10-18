@@ -56,11 +56,9 @@ class FaceRecognitionApp:
                     "flight_status": "Landed",
                 },
                 {
-                    "Passenger Name": "Albert",
                     "Date of Birth": "2000-05-01",
                     "Language": "English",
                     "Lounge Name": "SilverKris Business Class Lounge",
-                    "passengerId": "passenger_albert",
                     "changi_app_user_id": "CAU12345SQ",
                     "next_flight_id": "SQ123",
                     "has_lounge_access": True,
@@ -93,11 +91,9 @@ class FaceRecognitionApp:
                     "flight_status": "Landed",
                 },
                 {
-                    "Passenger Name": "Beatrice",
                     "Date of Birth": "1985-12-15",
                     "Language": "Mandarin",
                     "Lounge Name": "KrisFlyer Gold Lounge",
-                    "passengerId": "passenger_beatrice",
                     "changi_app_user_id": "CAU67890SQ",
                     "next_flight_id": "SQ456",
                     "has_lounge_access": True,
@@ -130,11 +126,9 @@ class FaceRecognitionApp:
                     "flight_status": "Landed",
                 },
                 {
-                    "Passenger Name": "Charlie",
                     "Date of Birth": "1970-03-22",
                     "Language": "French",
                     "Lounge Name": "The Private Room",
-                    "passengerId": "passenger_charlie",
                     "changi_app_user_id": "CAU24680SQ",
                     "next_flight_id": "SQ789",
                     "has_lounge_access": True,
@@ -153,9 +147,20 @@ class FaceRecognitionApp:
         self.main_frame = ttk.Frame(self.master, padding="10")
         self.main_frame.pack(fill=tk.BOTH, expand=True)
 
+        # Passenger Name field
+        tk.Label(self.main_frame, text="Passenger Name:").grid(
+            row=0, column=0, sticky="w", pady=(0, 10)
+        )
+        self.passenger_name_var = tk.StringVar()
+        self.passenger_name_entry = ttk.Entry(
+            self.main_frame, textvariable=self.passenger_name_var
+        )
+        self.passenger_name_entry.grid(row=0, column=1, sticky="we", pady=(0, 10))
+        self.passenger_name_var.trace("w", self.update_passenger_id)
+
         # Persona selection
         tk.Label(self.main_frame, text="Select Persona:").grid(
-            row=0, column=0, sticky="w", pady=(0, 10)
+            row=1, column=0, sticky="w", pady=(0, 10)
         )
         self.persona_var = tk.StringVar()
         self.persona_dropdown = ttk.Combobox(
@@ -163,12 +168,12 @@ class FaceRecognitionApp:
             textvariable=self.persona_var,
             values=[f"Persona {i+1}" for i in range(len(self.personna))],
         )
-        self.persona_dropdown.grid(row=0, column=1, sticky="we", pady=(0, 10))
+        self.persona_dropdown.grid(row=1, column=1, sticky="we", pady=(0, 10))
         self.persona_dropdown.bind("<<ComboboxSelected>>", self.update_data_displays)
 
         # Frame for displaying persona data
         self.persona_frame = ttk.Frame(self.main_frame)
-        self.persona_frame.grid(row=1, column=0, columnspan=2, sticky="nsew")
+        self.persona_frame.grid(row=2, column=0, columnspan=2, sticky="nsew")
 
         # Flight data display
         tk.Label(self.persona_frame, text="Flight Data:").grid(
@@ -191,7 +196,7 @@ class FaceRecognitionApp:
         # Camera control buttons
         self.camera_frame = ttk.Frame(self.main_frame)
         self.camera_frame.grid(
-            row=2, column=0, columnspan=2, sticky="nsew", pady=(10, 0)
+            row=3, column=0, columnspan=2, sticky="nsew", pady=(10, 0)
         )
 
         self.start_camera_button = ttk.Button(
@@ -227,14 +232,18 @@ class FaceRecognitionApp:
         self.canvas = tk.Canvas(
             self.main_frame, width=self.display_width, height=self.display_height
         )
-        self.canvas.grid(row=3, column=0, columnspan=2, pady=10)
+        self.canvas.grid(row=4, column=0, columnspan=2, pady=10)
 
         # Configure grid weights
         self.main_frame.columnconfigure(1, weight=1)
-        self.main_frame.rowconfigure(3, weight=1)
+        self.main_frame.rowconfigure(4, weight=1)
 
         # Initialize captured faces
         self.captured_faces = []
+
+    def update_passenger_id(self, *args):
+        passenger_name = self.passenger_name_var.get()
+        self.passenger_id = f"passenger_{passenger_name.replace(' ', '_').lower()}"  # Store it in an instance variable
 
     def update_data_displays(self, event):
         selected_value = self.persona_var.get()
@@ -255,10 +264,12 @@ class FaceRecognitionApp:
             self.flight_data_display.delete("1.0", tk.END)
             self.flight_data_display.insert(tk.END, json.dumps(flight_data, indent=2))
 
-            # Display the passenger data
+            # Display the passenger data (excluding the name)
+            passenger_data_display = passenger_data.copy()
+            passenger_data_display.pop("Passenger Name", None)
             self.passenger_data_display.delete("1.0", tk.END)
             self.passenger_data_display.insert(
-                tk.END, json.dumps(passenger_data, indent=2)
+                tk.END, json.dumps(passenger_data_display, indent=2)
             )
         else:
             messagebox.showerror("Error", "Invalid persona selection")
@@ -324,6 +335,11 @@ class FaceRecognitionApp:
             messagebox.showerror("Error", "No faces captured.")
             return
 
+        passenger_name = self.passenger_name_var.get()
+        if not passenger_name:
+            messagebox.showerror("Error", "Passenger name cannot be empty.")
+            return
+
         selected_value = self.persona_var.get()
         if not selected_value:
             messagebox.showerror("Error", "No persona selected.")
@@ -345,16 +361,15 @@ class FaceRecognitionApp:
         # Convert all captured faces to base64
         images_base64 = []
         for face in self.captured_faces:
-            # face is already in BGR format, so we don't need to convert it
             _, buffer = cv2.imencode(".jpg", face)
             images_base64.append(base64.b64encode(buffer).decode("utf-8"))
 
         # Prepare payload
         payload = {
-            "userId": passenger_data["passengerId"],
+            "userId": self.passenger_id,  # Use the instance variable
             "images": images_base64,
             "passengerData": {
-                "name": passenger_data["Passenger Name"],
+                "name": passenger_name,
                 "dateOfBirth": passenger_data["Date of Birth"],
                 "changi_app_user_id": passenger_data["changi_app_user_id"],
                 "next_flight_id": passenger_data["next_flight_id"],
