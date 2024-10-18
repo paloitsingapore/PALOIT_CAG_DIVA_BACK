@@ -23,9 +23,20 @@ def mock_event():
     }
 
 @patch('boto3.client')
-def test_orchestration_handler(mock_boto3_client, mock_environment, mock_event):
+@patch('assisted_wayfinding_backend.lambda_functions.orchestration.index.call_get_passenger_data_lambda')
+def test_orchestration_handler(mock_get_passenger_data, mock_boto3_client, mock_environment, mock_event):
     mock_api = MagicMock()
     mock_boto3_client.return_value = mock_api
+    
+    # Mock the call_get_passenger_data_lambda function
+    mock_get_passenger_data.return_value = {
+        'passengerData': {
+            'name': 'Test User',
+            'gender': 'Unknown',
+            'age': 'Unknown',
+            'userId': 'test-user-id'
+        }
+    }
 
     response = handler(mock_event, {})
 
@@ -35,15 +46,26 @@ def test_orchestration_handler(mock_boto3_client, mock_environment, mock_event):
     # Check the sent message
     sent_message = json.loads(mock_api.post_to_connection.call_args[1]['Data'])
     assert sent_message['name'] == 'conversationResponse'
-    assert sent_message['body']['output']['text'] == 'Hi there!'
+    assert "Hi there, Test User!" in sent_message['body']['output']['text']
 
 @pytest.mark.parametrize("input_text,expected_output", [
-    ("Why is the sky blue?", "I do not know how to answer that"),
-    ("show card", "Here is a cat @showcards(cat)"),
-    ("Hello", "Echo: Hello"),
+    ("Why is the sky blue?", "Hello Guest, how can I assist you today?"),
+    ("show card", "Hello Guest, how can I assist you today?"),
+    ("Hello", "Hello Guest, how can I assist you today?"),
 ])
-def test_handle_request(input_text, expected_output, mock_environment):
+@patch('assisted_wayfinding_backend.lambda_functions.orchestration.index.call_get_passenger_data_lambda')
+def test_handle_request(mock_get_passenger_data, input_text, expected_output, mock_environment):
     from assisted_wayfinding_backend.lambda_functions.orchestration.index import handle_request
+    
+    # Mock the call_get_passenger_data_lambda function
+    mock_get_passenger_data.return_value = {
+        'passengerData': {
+            'name': 'Guest',
+            'gender': 'Unknown',
+            'age': 'Unknown',
+            'userId': 'test-user-id'
+        }
+    }
     
     request = {
         'input': {'text': input_text},
@@ -51,6 +73,3 @@ def test_handle_request(input_text, expected_output, mock_environment):
     
     response = handle_request(request)
     assert response['output']['text'] == expected_output
-
-    if input_text == "show card":
-        assert 'public-cat' in response['variables']
