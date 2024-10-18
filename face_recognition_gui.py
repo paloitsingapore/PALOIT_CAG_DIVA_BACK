@@ -39,7 +39,7 @@ class FaceRecognitionApp:
             [
                 {
                     "id": "SQ001-2024-08-15",
-                    "flightno": "SQ001",
+                    "flightno": "SQ123",
                     "scheduled_date": "2024-08-15",
                     "scheduled_time": "1150",
                     "terminal": "3",
@@ -74,7 +74,7 @@ class FaceRecognitionApp:
             [
                 {
                     "id": "SQ002-2024-08-15",
-                    "flightno": "SQ002",
+                    "flightno": "SQ456",
                     "scheduled_date": "2024-08-15",
                     "scheduled_time": "1150",
                     "terminal": "3",
@@ -109,7 +109,7 @@ class FaceRecognitionApp:
             [
                 {
                     "id": "SQ003-2024-08-15",
-                    "flightno": "SQ003",
+                    "flightno": "SQ789",
                     "scheduled_date": "2024-08-15",
                     "scheduled_time": "1150",
                     "terminal": "3",
