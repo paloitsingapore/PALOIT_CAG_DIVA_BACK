@@ -18,6 +18,7 @@ def mock_environment(monkeypatch):
     monkeypatch.setenv("DYNAMODB_TABLE_NAME", "test-table")
     monkeypatch.setenv("REKOGNITION_COLLECTION_ID", "test-collection")
     monkeypatch.setenv("S3_BUCKET_NAME", "test-bucket")
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "ap-southeast-1")
 
 
 @pytest.fixture
