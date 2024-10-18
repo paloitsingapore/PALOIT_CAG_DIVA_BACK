@@ -14,6 +14,7 @@ class TestRemoveAllFaces(unittest.TestCase):
             {
                 "DYNAMODB_TABLE_NAME": "test-table",
                 "REKOGNITION_COLLECTION_ID": "test-collection",
+                "AWS_DEFAULT_REGION": "ap-southeast-1",
             },
         )
         self.env_patcher.start()
