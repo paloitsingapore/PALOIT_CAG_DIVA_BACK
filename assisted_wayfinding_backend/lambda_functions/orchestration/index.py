@@ -50,13 +50,17 @@ def handle_request(req):
     return resp
 
 def call_get_passenger_data_lambda(persona_id):
-    lambda_client = boto3.client('lambda')
-    response = lambda_client.invoke(
-        FunctionName='get_passenger_data_lambda',
-        InvocationType='RequestResponse',
-        Payload=json.dumps({'personaId': persona_id})
-    )
-    return json.loads(response['Payload'].read())
+    try:
+        lambda_client = boto3.client('lambda')
+        response = lambda_client.invoke(
+            FunctionName='get_passenger_data_lambda',
+            InvocationType='RequestResponse',
+            Payload=json.dumps({'personaId': persona_id})
+        )
+        return json.loads(response['Payload'].read())
+    except Exception as e:
+        print(f"Error calling get_passenger_data_lambda: {str(e)}")
+        return {'passengerData': {}}  # Return default data on error
 
 def generate_context(passenger_data_response):
     passenger_data = passenger_data_response.get('passengerData', {})
