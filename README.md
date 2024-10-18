@@ -129,8 +129,17 @@ To help you indexing the faces we created 2 videos in the folder
 
 Once you have added your faces, you can run the front end and explore 
 
+
+### Next step, Front end configuration.
 When the face has been indexed, you can install and run the frontend.
 
+
+##### PLEASE NOTE
+For the test of the POC, you can ignore deploying your own CDK.
+PALO IT shares a working environement and this enviroment will be running until end of Novemeber.
+
+1 - Add Faces and peronas
+2 - run the front end at this address http://staging.d32b1muquuvyhn.amplifyapp.com/
 
 
 Enjoy!
