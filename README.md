@@ -24,13 +24,18 @@ on mac os: brew install python-tk
 on linux: sudo apt-get install python-tk
 
 
-Create .env file at the root of the project
+Create .env file at the root of the project based in the .env_template file
+
+##### PLEASE NOTE
+To facilitate the exploration of the POC, PALO IT shares a working environement. 
+This enviroment will be running until end of Novemeber.
 ```
 CDK_DEFAULT_ACCOUNT=034362042832
 CDK_DEFAULT_REGION=ap-southeast-1
 API_ENDPOINT_URL= https://ed5zq5eya8.execute-api.ap-southeast-1.amazonaws.com/prod/
 API_KEY=sO7UjJjqBg61I8uWVS6cu1ijLtwEx4Wg2x7xQUdK
 ```
+
 
 To manually create a virtualenv on MacOS and Linux:
 ```
@@ -58,6 +63,23 @@ $ pip install -r requirements.txt
 
 
 ## CDK 
+
+### Prerequisites (can be ignored if using the provided credentials)
+ 
+**AWS CLI**: Ensure that the AWS CLI is installed and configured with appropriate credentials.
+ 
+```
+$ aws configure
+```
+ 
+**CDK Toolkit**: Install the CDK Toolkit globally if it’s not already installed.
+ 
+ 
+```
+$ npm install -g aws-cdk
+```
+
+
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
@@ -106,4 +128,9 @@ To help you indexing the faces we created 2 videos in the folder
 
 
 Once you have added your faces, you can run the front end and explore 
+
+When the face has been indexed, you can install and run the frontend.
+
+
+
 Enjoy!
