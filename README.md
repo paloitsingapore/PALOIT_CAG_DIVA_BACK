@@ -62,9 +62,9 @@ $ pip install -r requirements.txt
 ```
 
 
-## CDK 
+## CDK  (can be ignored if using the provided credentials)
 
-### Prerequisites (can be ignored if using the provided credentials)
+### Prerequisites
  
 **AWS CLI**: Ensure that the AWS CLI is installed and configured with appropriate credentials.
  
